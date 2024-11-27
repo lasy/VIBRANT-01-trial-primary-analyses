@@ -1,0 +1,3 @@
+"0",""
+"0","clin <- clin |> mutate(planned = TRUE, attended = ifelse(str_detect(visit_name, ""Daily""), NA, TRUE))"
+"0",""

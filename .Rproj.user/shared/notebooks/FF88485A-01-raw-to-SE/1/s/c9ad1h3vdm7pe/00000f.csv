@@ -1,0 +1,34 @@
+"0",""
+"0","(se_16S <- phyloseq_to_SE(w16S))"
+"1","[38;5;246m# A SummarizedExperiment-tibble abstraction: 3,000 × 13[39m
+"
+"1","[38;5;246m# [90mFeatures=3 | Samples=1000 | Assays=ASV_counts, ASV_prop[0m[39m
+"
+"1","   .feature     .sample ASV_counts ASV_prop barcode     pid   visit_code Kingdom  Phylum         Class          Order           Family Genus
+"
+"1","   [3m[38;5;246m<chr>[39m[23m        [3m[38;5;246m<chr>[39m[23m        [3m[38;5;246m<dbl>[39m[23m    [3m[38;5;246m<dbl>[39m[23m [3m[38;5;246m<chr>[39m[23m       [3m[38;5;246m<fct>[39m[23m      [3m[38;5;246m<dbl>[39m[23m [3m[38;5;246m<chr>[39m[23m    [3m[38;5;246m<chr>[39m[23m          [3m[38;5;246m<chr>[39m[23m          [3m[38;5;246m<chr>[39m[23m           [3m[38;5;246m<chr>[39m[23m  [3m[38;5;246m<chr>[39m[23m
+"
+"1","[38;5;250m 1[39m L. crispatus p1_0            30    0.24  16S_p1_0    p1             0 Bacteria Firmicutes     Bacilli        Lactobacillales Lachn… Genu…
+"
+"1","[38;5;250m 2[39m L. iners     p1_0            36    0.288 16S_p1_0    p1             0 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m 3[39m non-Lacto    p1_0            59    0.472 16S_p1_0    p1             0 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m 4[39m L. crispatus p1_1000         49    0.340 16S_p1_1000 p1          [4m1[24m000 Bacteria Firmicutes     Bacilli        Lactobacillales Lachn… Genu…
+"
+"1","[38;5;250m 5[39m L. iners     p1_1000         42    0.292 16S_p1_1000 p1          [4m1[24m000 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m 6[39m non-Lacto    p1_1000         53    0.368 16S_p1_1000 p1          [4m1[24m000 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m 7[39m L. crispatus p1_1100         45    0.344 16S_p1_1100 p1          [4m1[24m100 Bacteria Firmicutes     Bacilli        Lactobacillales Lachn… Genu…
+"
+"1","[38;5;250m 8[39m L. iners     p1_1100         36    0.275 16S_p1_1100 p1          [4m1[24m100 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m 9[39m non-Lacto    p1_1100         50    0.382 16S_p1_1100 p1          [4m1[24m100 Bacteria Actinobacteria Actinobacteria Bifidobacteria… Bifid… Genu…
+"
+"1","[38;5;250m10[39m L. crispatus p1_1200         47    0.362 16S_p1_1200 p1          [4m1[24m200 Bacteria Firmicutes     Bacilli        Lactobacillales Lachn… Genu…
+"
+"1","[38;5;246m# ℹ 50 more rows[39m
+"
+"1","[38;5;246m# ℹ Use `print(n = ...)` to see more rows[39m
+"

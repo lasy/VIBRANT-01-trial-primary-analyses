@@ -1,0 +1,8 @@
+"0",""
+"0","col_by_week5 <- "
+"0","  colonization |> "
+"0","  left_join(colData(mae) |> as_tibble()) |> "
+"0","  filter(visit_code == 1500)"
+"2","Joining with `by = join_by(.sample, pid, visit_code)`"
+"0","  "
+"0",""

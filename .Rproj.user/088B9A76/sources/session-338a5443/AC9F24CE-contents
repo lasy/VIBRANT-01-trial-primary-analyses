@@ -1,0 +1,138 @@
+---
+title: "VIBRANT Trial - Primary Analyses"
+author: Laura Symul, Laura Vermeren, Susan Holmes
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+```{r}
+#| warning: false
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(patchwork)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+library(brms)
+# library(mia) # BiocManager::install("mia")
+
+theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+
+```
+
+```{r}
+
+data_source <- "simulated"
+
+```
+
+
+
+# Introduction
+
+This document presents the primary analyses of the VIBRANT trial. 
+
+Currently, this runs on simulated data, but the code is mostly ready to be run on the real data once it is available.
+
+The simulated data is currently relatively realistic (but still needs some improvement), and is very optimistic (assumes a very successful trial).
+
+Until we have the actual data, we intend to improve the simulated data (= make them more realistic) by
+
+- [ ] Model the metagenomic data from an actual file provided by Jacques' lab (currently, we "invented" the format, but it would be much better to have an actual pilot example).
+- [ ] Add demographic variables
+- [ ] Add dropouts (participants who left the study before the endpoint), missed visits or missed data (failed assay or uncollected sample)
+- [ ] Add replacements
+- [ ] Add differences in LBP strain survival rates between sites, arms, and participants
+- [ ] Add inter-individual variability in how long the LBP strains survive
+- [ ] Add bacterial species (currently, we only have the 15 LBP strains, "other" L. crispatus, L. iners, and "non-Lacto" (lumped together))
+- [ ] (add contamination)
+
+Consequently, some (supplementary) analyses are still missing
+
+- [ ] Demographics (Table 1)
+- [ ] Sensitivity analyses for the different populations (ITT, mITT, PP)
+- [ ] ... + search for "TODO" or "XXX" within the document (placeholders for analyses that still need to be implemented or text that needs to be written)
+
+These will be implemented once the corresponding improvement steps detailed above are themselves implemented.
+
+Even with all these improvements, there will, inevitably, be un-anticipated issues with the real data, but the core of the methods (and corresponding code) will likely be unchanged.
+
+## Workflow
+
+The document is organized as follow
+
+- Data preparation: load the raw data as provided by labs/teams, and collate them into a neat `MultiAssayExperiment` object containing all the data linked by `participant x visit`.
+
+- Checks, QC, and Outcomes Definitions: check the data for potential issues, perform quality controls (e.g, check for library sizes, potential contamination, etc.), and define outcomes of interest (colonization status, etc.)
+
+- Analyses: perform the primary analyses of the trial, including demographics, primary and secondary outcomes, and sensitivity analyses. 
+This section has the main tables and figures.
+
+
+
+# Data preparation
+
+## Loading the data and creating `SummarizedExperiment` objects for each assays
+
+
+
+```{r child = '01-raw-to-SE.qmd'}
+```
+
+
+## Integrating all assays into a `MultiAssayExperiment` object
+
+```{r child = '02-SE-to-MAE.qmd'}
+```
+
+# Checks, QC, and Outcomes Definitions
+
+## Checks and Quality Controls
+
+```{r child = '03-checks-and-QC.qmd'}
+```
+
+
+
+## Outcomes definitions
+
+```{r child = '04-outcomes-definitions.qmd'}
+```
+
+We now have an "augmented" `MAE` object with the following assays:
+
+```{r}
+mae
+```
+
+# Analyses
+
+## Demographics (Table 1)
+
+> TODO
+
+## Primary outcomes (Table 2)
+
+```{r child = '06-primary-outcome.qmd'}
+```
+
+## Secondary outcomes (Figures 2-4)
+
+```{r child = '07-secondary-outcomes.qmd'}
+```
+

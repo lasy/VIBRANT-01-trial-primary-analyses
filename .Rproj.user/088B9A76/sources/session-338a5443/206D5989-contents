@@ -1,0 +1,66 @@
+---
+title: "From raw data to SE objects"
+author: Laura Symul
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+
+
+
+```{r}
+#| warning: false
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+# library(mia) # BiocManager::install("mia")
+
+theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+
+```
+
+```{r}
+
+data_source <- "simulated"
+
+```
+
+
+
+## Weekly metagenomics data with LBP strains relative abundances
+
+```{r}
+
+# mg <- read_csv()
+
+```
+
+## Weekly 16S rRNA data
+
+```{r}
+
+w16S <- readRDS(str_c(data_dir(), "weekly 16S/w16S.RDS"))
+SE_16S <- phyloseq_to_SE(w16S)
+
+
+
+```
+
+

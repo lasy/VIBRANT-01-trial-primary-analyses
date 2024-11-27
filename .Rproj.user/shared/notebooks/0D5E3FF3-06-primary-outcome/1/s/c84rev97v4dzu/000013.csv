@@ -1,0 +1,1 @@
+"0","bind_cols(col_by_week5_agg, predict(bfit))"

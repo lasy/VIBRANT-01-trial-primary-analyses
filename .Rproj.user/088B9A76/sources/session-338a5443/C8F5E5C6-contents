@@ -1,0 +1,213 @@
+---
+title: "Primary trial outcome"
+author: Laura Symul, Laura Vermeren, Susan Holmes
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+
+### Colonization by week 5
+
+
+```{r}
+
+col_by_week5 <- 
+  colonization |> 
+  left_join(colData(mae) |> as_tibble()) |> 
+  filter(visit_code == 1500)
+  
+
+```
+
+
+**Visualization of the primary outcome**
+
+```{r}
+#| fig-width: 10
+#| fig-height: 1.1
+
+col_by_week5 |> 
+  arrange(site, arm, colonized_by) |>
+  group_by(site, arm) |> 
+  mutate(participant_number = row_number() |> factor()) |> 
+  ungroup() |> 
+  ggplot(aes(x = participant_number, y = site, col = site, fill = site, shape = colonized_by)) +
+  geom_point(size = 3) +
+  facet_grid(. ~ arm, scales = "free_x") +
+  guides(color = "none", fill = "none") +
+  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
+  xlab("Participant number") + ylab("")
+
+```
+
+
+```{r}
+
+summary_table <- 
+  col_by_week5 |> 
+  group_by(site, arm) |> 
+  summarize(
+    n = n(), 
+    n_success = sum(colonized_by),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+
+```{r}
+
+summary_table |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants",
+        name == "LBP_strain_detected" ~ "n (%) of participants\nwith LBP strain detected",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(id_cols = c(site, name), names_from = arm, values_from = value) |> 
+  group_by(site) |> 
+  gt(caption = "Table 1: Colonization by week 5 by arm and site") |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+  
+```
+> TODO: include the p-values from model/test below
+
+
+#### Tests / models
+
+If we have 0 successes in none of the Placebo arm, we won't be able to use a logistic regression model that accounts for site differences since we have a "perfect separation issue" and the odds are infinite for the Placebo arm:
+
+
+```{r}
+
+fit <- glm(colonized_by ~ arm + site + arm:site, data = col_by_week5, family = binomial)
+fit |> summary()
+
+```
+
+There are a few ways to remedy that: 
+
+- One way is to use a "pseudo-Bayesian" approach and to add 1 artificial success to all arms, but this introduces a small "defavorable" bias in the odds ratio estimates (and theoretically increases the p-values).
+
+```{r}
+
+tmp <- 
+  col_by_week5 |> 
+  bind_rows(
+    col_by_week5 |> 
+      select(arm, site) |> 
+      distinct() |> 
+      mutate(colonized_by = TRUE)
+  )
+
+fit <- glm(colonized_by ~ arm + site + arm:site, data = tmp, family = binomial)
+fit |> summary()
+
+```
+
+- Another way is to use an actual Bayesian model that accounts for site differences, but this does not provide p-values, only posterior distributions (and confidence intervals).
+
+```{r}
+
+col_by_week5_agg <- 
+  col_by_week5 |>
+  group_by(site, arm) |>
+  summarise(success = colonized_by |> sum(), ntrials = n())
+
+bfit <- 
+  brm(
+    success | trials(ntrials) ~ arm + site + arm:site, 
+    data = col_by_week5_agg, 
+    family = binomial("logit")
+    )
+summary(bfit)
+plot(bfit)
+bind_cols(col_by_week5_agg, predict(bfit))
+plot(conditional_effects(bfit), ask = FALSE)
+# loo(bfit, moment_match = TRUE, reloo = TRUE)
+# pp_check(bfit)
+
+```
+
+
+- Alternatively, we can use exact fisher tests (as initially proposed by Lara Lewis, CAPRISA) for each arm x site, correcting for multiple testing, but this does not allow us to directly test for site differences.
+
+```{r}
+
+fisher_test_res <- tibble()
+
+for (selected_site in levels(col_by_week5$site)) {
+  for (selected_arm in levels(col_by_week5$arm)[-1]) {
+    ft <- 
+      col_by_week5 |> 
+      filter(site == selected_site, arm %in% c("Pl", selected_arm)) |> 
+      mutate(arm = arm |> fct_drop()) |> 
+      select(colonized_by, arm) |> 
+      table() |> 
+      fisher.test()
+    fisher_test_res <- 
+      fisher_test_res |> 
+      bind_rows(
+        tibble(
+          site = selected_site,
+          arm = selected_arm,
+          odds = ft$estimate,
+          pvalue = ft$p.value
+        )
+      )
+  }
+}
+
+fisher_test_res <- 
+  fisher_test_res |> 
+  mutate(
+    qval = p.adjust(pvalue, method = "BH")
+  )
+
+fisher_test_res |> 
+  group_by(site) |> 
+  gt(caption = "Fisher exact test results")
+
+
+```
+
