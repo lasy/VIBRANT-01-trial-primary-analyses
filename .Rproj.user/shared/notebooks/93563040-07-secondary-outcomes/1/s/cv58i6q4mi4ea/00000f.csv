@@ -1,8 +1,0 @@
-"0",""
-"0","LBP_strains <- "
-"0","  mae[[""LBP_rel_ab""]] |> "
-"0","  as_tibble() |> "
-"0","  left_join(mae |> colData() |> as_tibble())"
-"2","Joining with `by = join_by(.sample)`"
-"0","  "
-"0",""

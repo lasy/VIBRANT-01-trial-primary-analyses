@@ -89,8 +89,6 @@ This section has the main tables and figures.
 
 ## Loading the data and creating `SummarizedExperiment` objects for each assays
 
-
-
 ```{r child = '01-raw-to-SE.qmd'}
 ```
 
@@ -125,6 +123,9 @@ mae
 ## Demographics (Table 1)
 
 > TODO
+
+See https://www.danieldsjoberg.com/gtsummary/
+
 
 ## Primary outcomes (Table 2)
 

@@ -1,3 +1,0 @@
-"0","plot(conditional_effects(bfit), ask = FALSE)"
-"2","Setting all 'trials' variables to 1 by default if not specified otherwise.
-"
