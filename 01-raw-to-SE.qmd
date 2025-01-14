@@ -138,6 +138,7 @@ mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
   
   if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
   
+  mg <- mg |> filter(!is.na(prop_of_Lc))
   mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
   tmp <- mg |> select(barcode, sample_id) |> distinct()
   if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
@@ -145,14 +146,14 @@ mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
   assay_prop_of_Lc <- 
     mg |> 
     select(sample_id, strain, prop_of_Lc) |> 
-    pivot_wider(names_from = sample_id, values_from = prop_of_Lc) |> 
+    pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |> 
     as.data.frame() |> 
     column_to_rownames("strain") 
     
   assay_unique_kmers <- 
     mg |> 
     select(sample_id, strain, unique_kmers) |> 
-    pivot_wider(names_from = sample_id, values_from = unique_kmers) |> 
+    pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
     as.data.frame() |> 
     column_to_rownames("strain")
   
@@ -281,7 +282,9 @@ phyloseq_to_SE <- function(physeq){
 #### Checks & Quality Controls
 
 
-**Total reads per sample**
+
+
+**16S Total reads per sample**
 
 ```{r}
 #| fig-height: 3

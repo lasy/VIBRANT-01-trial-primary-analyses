@@ -64,6 +64,7 @@ assay_list <-
   list(
     visit_attendance = se_va,
     mg_ksanity = se_mg,
+    # mg_virgo2 = se_mg_V,
     amplicon_ASV_all = se_16S
     )
 

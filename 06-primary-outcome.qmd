@@ -137,8 +137,13 @@ tmp <-
     col_by_week5 |> 
       select(arm, site) |> 
       distinct() |> 
-      mutate(colonized_by = TRUE)
-  )
+      mutate(colonized_by = TRUE),
+    col_by_week5 |> 
+      select(arm, site) |> 
+      distinct() |> 
+      mutate(colonized_by = FALSE)
+  ) |> 
+  filter(! (arm %in% c("LC-106-3", "LC-106-o")))
 
 fit <- glm(colonized_by ~ arm + site + arm:site, data = tmp, family = binomial)
 fit |> summary()
@@ -173,40 +178,41 @@ plot(conditional_effects(bfit), ask = FALSE)
 - Alternatively, we can use exact fisher tests (as initially proposed by Lara Lewis, CAPRISA) for each arm x site, correcting for multiple testing, but this does not allow us to directly test for site differences.
 
 ```{r}
-# 
-# fisher_test_res <- tibble()
-# 
-# for (selected_site in levels(col_by_week5$site)) {
-#   for (selected_arm in levels(col_by_week5$arm)[-1]) {
-#     ft <- 
-#       col_by_week5 |> 
-#       filter(site == selected_site, arm %in% c("Pl", selected_arm)) |> 
-#       mutate(arm = arm |> fct_drop()) |> 
-#       select(colonized_by, arm) |> 
-#       table() |> 
-#       fisher.test()
-#     fisher_test_res <- 
-#       fisher_test_res |> 
-#       bind_rows(
-#         tibble(
-#           site = selected_site,
-#           arm = selected_arm,
-#           odds = ft$estimate,
-#           pvalue = ft$p.value
-#         )
-#       )
-#   }
-# }
-# 
-# fisher_test_res <- 
-#   fisher_test_res |> 
-#   mutate(
-#     qval = p.adjust(pvalue, method = "BH")
-#   )
-# 
-# fisher_test_res |> 
-#   group_by(site) |> 
-#   gt(caption = "Fisher exact test results")
+#| eval: false
+
+fisher_test_res <- tibble()
+
+for (selected_site in levels(col_by_week5$site)) {
+  for (selected_arm in levels(col_by_week5$arm)[-1]) {
+    ft <-
+      col_by_week5 |>
+      filter(site == selected_site, arm %in% c("Pl", selected_arm)) |>
+      mutate(arm = arm |> fct_drop()) |>
+      select(colonized_by, arm) |>
+      table() |>
+      fisher.test()
+    fisher_test_res <-
+      fisher_test_res |>
+      bind_rows(
+        tibble(
+          site = selected_site,
+          arm = selected_arm,
+          odds = ft$estimate,
+          pvalue = ft$p.value
+        )
+      )
+  }
+}
+
+fisher_test_res <-
+  fisher_test_res |>
+  mutate(
+    qval = p.adjust(pvalue, method = "BH")
+  )
+
+fisher_test_res |>
+  group_by(site) |>
+  gt(caption = "Fisher exact test results")
 
 
 ```

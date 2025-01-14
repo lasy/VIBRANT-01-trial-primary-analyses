@@ -63,7 +63,7 @@ From this, we can compute the total relative abundance of all LBP strains or the
 
 If the total relative abundance of all LBP strains is larger than 0.1 or the maximum relative abundance of any LBP strain is larger than 0.05, we consider that the LBP achieved colonization *at* that visit.
 
-@LV : add na.rm = TRUE
+
 
 ```{r}
 
@@ -73,8 +73,8 @@ colonization <-
   left_join(colData(mae) |> as_tibble(),by = join_by(.sample)) |> 
   group_by(.sample, pid, visit_code) |> 
   summarize(
-    total_prop_at = sum(LBP_rel_ab, na.rm = TRUE),
-    max_prop_at = max(LBP_rel_ab, na.rm = TRUE),
+    total_prop_at = sum(LBP_rel_ab), # , na.rm = TRUE
+    max_prop_at = max(LBP_rel_ab), # , na.rm = TRUE
     .groups = "drop"
   ) |> 
   mutate(
