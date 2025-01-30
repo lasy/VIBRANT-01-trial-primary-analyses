@@ -1,0 +1,32 @@
+---
+title: "Demographics table"
+author: Laura Symul & Laura Vermeren
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+In this section we will create a table with the demographics of the participants in the study. 
+
+```{r}
+
+participants |> 
+  select(-c("pid", "dropout_time"))  |> 
+  tbl_summary(by=arm, 
+              type = list(nb_partner_pastmonth ~ "continuous", nb_partner_life ~ "continuous")
+  )
+
+```
+

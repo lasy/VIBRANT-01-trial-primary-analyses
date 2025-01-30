@@ -28,6 +28,7 @@ library(patchwork)
 library(SummarizedExperiment)
 library(tidySummarizedExperiment)
 library(brms)
+library(gtsummary)
 # library(mia) # BiocManager::install("mia")
 
 theme_set(theme_light())
