@@ -24,11 +24,28 @@ editor: source
 
 ```{r}
 
-col_by_week5 <- 
-  colonization |> 
-  left_join(colData(mae) |> as_tibble()) |> 
-  filter(visit_code == 1500)
+# col_by_week5 <- 
+#   colonization |> 
+#   left_join(colData(mae) |> as_tibble()) |> 
+#   filter(visit_code == 1500)
+
   
+col_by_week5 <- 
+  expand_grid(
+    site = c("MGH", "CAP") |> factor(),
+    arm = c("Pl", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115") |> fct_inorder(),
+    pid = 1:10
+  ) |> 
+  slice_sample(prop = 0.9) |> 
+  mutate(
+    p = 0.0 + c(0, 0.5, 0.4, 0.7, 0.6)[arm |> as.integer()],
+    colonized_by = (rbinom(n(), 1, p) == 1)
+  )
+
+col_by_week5 <- 
+  col_by_week5 |> 
+  mutate(out = (site == "MGH") & (arm %in% c("LC-106-3", "LC-106-o")) & (pid > 4)) |>
+  filter(!out)
 
 ```
 
@@ -94,7 +111,7 @@ summary_table |>
   ) |> 
   pivot_wider(id_cols = c(site, name), names_from = arm, values_from = value) |> 
   group_by(site) |> 
-  gt(caption = "Table 1: Colonization by week 5 by arm and site") |> 
+  gt(caption = "Table 1: Colonization by week 5 by arm and site", row_group_as_column = TRUE) |> 
   cols_width(
     "name" ~ px(200),
     everything() ~ px(120)
