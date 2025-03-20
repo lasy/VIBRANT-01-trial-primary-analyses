@@ -8,7 +8,7 @@
 
 -   [ ] Checks and QC ➞ total mg reads
 
--   [ ] Pour les simulations ➞ k_sanity: il ne devrait pas y avoir de NA "completely random" (soit manquant pour toute la visite, soit pas manquant ➞ 0).
+-   [x] Pour les simulations ➞ k_sanity: il ne devrait pas y avoir de NA "completely random" (soit manquant pour toute la visite, soit pas manquant ➞ 0).
 
 -   [x] Aussi dans les simulations: ajouter des participants qui ne sont pas venu à des visites (plic-ploc) ➞ tous les assays sont manquants pour cette visite.
 
@@ -20,6 +20,6 @@
 
 -   [x] Simulations: ajouter 1-4 participantes pour un des deux "dropped arms" at MGH
 
--   [ ] Simulations ➞ there should not be that much LBP strains in the Placebo arm ➞ check the gLV :)
+-   [x] Simulations ➞ there should not be that much LBP strains in the Placebo arm ➞ check the gLV :)
 
 -   [x] Demographics table (add as 05-Demographics.qmd)
