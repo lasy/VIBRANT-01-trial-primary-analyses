@@ -138,7 +138,7 @@ mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
   
   if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
   
-  mg <- mg |> filter(!is.na(prop_of_Lc))
+  mg <- mg |> filter(!is.na(`Lactobacillus crispatus`))
   mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
   tmp <- mg |> select(barcode, sample_id) |> distinct()
   if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
