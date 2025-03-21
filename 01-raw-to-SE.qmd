@@ -86,11 +86,12 @@ make_se_clin <- function(clin, cols, assayname){
   
 }
 
+
 ```
 
 ```{r}
 
-clin <- clin |> mutate(planned = TRUE, attended = ifelse(str_detect(visit_name, "Daily"), NA, TRUE))
+clin <- clin |> mutate(planned = TRUE, attended = ifelse(str_detect(visit_name, "Daily"), NA, attended)) #TRUE
 
 ```
 
@@ -111,6 +112,7 @@ We load the weekly metagenomics data, the manifest for the metagenomic barcodes,
 ```{r}
 
 mg <- read_csv(str_c(data_dir(), "01 metagenomics kSanity/mg_kSanity.csv"))
+mg_combined <- read_csv(str_c(data_dir(), "03 metagenomics combined/mg_combined.csv"))
 mg_manifest <- read_csv(str_c(data_dir(), "01 metagenomics kSanity/mg_kSanity_manifest.csv"))
 LBP_strain_info <- readxl::read_xlsx(str_c(dropbox_dir(), "9_VIBRANT_Study Product/IsolateNumbers.xlsx"))
 
@@ -131,47 +133,82 @@ LBP_strain_info |> gt(caption = "LBP strain information")
 
 ```{r}
 
-mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
+mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
   mg_manifest <- 
     mg_manifest |> 
     mutate(sample_id = str_c(pid, "_", visit_code))
   
   if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
   
-  mg <- mg |> filter(!is.na(`Lactobacillus crispatus`))
+  # mg <- mg |> filter(!is.na(`Lactobacillus crispatus`))
   mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
+  # mg_combined <- mg_combined |> filter(!is.na(`Lactobacillus crispatus`))
+  mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode))
   tmp <- mg |> select(barcode, sample_id) |> distinct()
   if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
   
   assay_prop_of_Lc <- 
     mg |> 
-    select(sample_id, strain, prop_of_Lc) |> 
-    pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |> 
+    # select(sample_id, strain, prop_of_Lc) |> 
+    # the new database is already in wide format 
+    # pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |> 
+    select(sample_id, everything()) |> 
+    select(-c(pid, visit_code, barcode)) |> 
     as.data.frame() |> 
-    column_to_rownames("strain") 
+    t() 
+  colnames(assay_prop_of_Lc) <- assay_prop_of_Lc[1, ]  
+  assay_prop_of_Lc <- assay_prop_of_Lc[-1, ]  
     
   assay_unique_kmers <- 
-    mg |> 
-    select(sample_id, strain, unique_kmers) |> 
-    pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
+    mg_combined |> 
+    # select(sample_id, strain, unique_kmers) |> 
+    # pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
+    select(sample_id, all_of(LBP_strain_info$strain_id), `Lactobacillus crispatus`) |> 
     as.data.frame() |> 
-    column_to_rownames("strain")
+    t()
+  colnames(assay_unique_kmers) <- assay_unique_kmers[1,]
+  assay_unique_kmers <- assay_unique_kmers[-1,]
   
-  se_coldata <- 
-    mg |> 
-    select(sample_id, barcode, shared_kmers) |> 
-    distinct() |> 
-    as.data.frame() 
-  
+  se_coldata <-
+    mg |>
+    select(sample_id, barcode) |> #shared_kmers
+    distinct() |>
+    as.data.frame()
+
   se_rowdata <- 
     mg |> 
-    select(strain) |> 
+    select(-c(barcode, pid, visit_code, sample_id)) |> 
+    colnames() |> 
+    as.data.frame() |> 
+    setNames("strain") |> 
     distinct() |> 
     left_join(
       LBP_strain_info,
       by = join_by(strain == strain_id)
     ) 
   
+  sorted_sample_ids <- sort(as.character(se_coldata$sample_id))
+  assay_prop_of_Lc <- assay_prop_of_Lc[, sorted_sample_ids]
+  assay_unique_kmers <- assay_unique_kmers[, sorted_sample_ids]
+  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sample_id), ]
+
+  # SummarizedExperiment does not run without this, I don't know why
+  # To try again and remove if is it possible
+  sorted_strains <- sort(as.character(se_rowdata$strain))
+  assay_prop_of_Lc <- assay_prop_of_Lc[sorted_strains, ]
+  assay_unique_kmers <- assay_unique_kmers[sorted_strains, ]
+  se_rowdata <- se_rowdata[match(sorted_strains, se_rowdata$strain), ]
+
+  rownames(assay_prop_of_Lc) <- as.character(rownames(assay_prop_of_Lc))
+  colnames(assay_prop_of_Lc) <- as.character(colnames(assay_prop_of_Lc))
+  rownames(assay_unique_kmers) <- as.character(rownames(assay_unique_kmers))
+  colnames(assay_unique_kmers) <- as.character(colnames(assay_unique_kmers))
+  se_rowdata$strain <- as.character(se_rowdata$strain)
+  se_coldata$sample_id <- as.character(se_coldata$sample_id)
+
+  se_rowdata <- as(se_rowdata, "DataFrame")
+  se_coldata <- as(se_coldata, "DataFrame")
+
   SummarizedExperiment::SummarizedExperiment(
     assays = list(prop_of_Lc = assay_prop_of_Lc, unique_kmers = assay_unique_kmers),
     rowData = se_rowdata,
@@ -185,7 +222,7 @@ mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
 
 ```{r}
 
-(se_mg <- mg_to_SE(mg, mg_manifest, LBP_strain_info))
+(se_mg <- mg_to_SE(mg,mg_combined,  mg_manifest, LBP_strain_info))
 
 ```
 
@@ -200,7 +237,9 @@ mg_to_SE <- function(mg, mg_manifest, LBP_strain_info){
 
 se_mg |> 
   as_tibble() |> 
-  group_by(.sample) |> summarize(total_unique_kmers = sum(unique_kmers)) |> 
+  mutate(unique_kmers = as.numeric(unique_kmers)) |>
+  group_by(.sample) |> 
+  summarize(total_unique_kmers = sum(unique_kmers)) |> 
   ggplot(aes(x = total_unique_kmers)) +
   geom_histogram() +
   scale_x_log10()
@@ -215,7 +254,8 @@ se_mg |>
 
 se_mg |> 
   as_tibble() |> 
-  mutate(.feature = .feature |> fct_inorder()) |> 
+  mutate(.feature = .feature |> fct_inorder(),
+         prop_of_Lc = as.numeric(prop_of_Lc)) |> 
   ggplot(aes(x = .feature, y = .sample, fill = prop_of_Lc)) +
   geom_tile() +
   scale_fill_continuous(low = "white", high = "steelblue2") +
