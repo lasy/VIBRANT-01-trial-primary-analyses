@@ -20,13 +20,21 @@ editor: source
 
 In this section we will create a table with the demographics of the participants in the study. 
 
+
+
 ```{r}
 
 participants |> 
   select(-c("pid", "dropout_time"))  |> 
-  tbl_summary(by=arm, 
-              type = list(nb_partner_pastmonth ~ "continuous", nb_partner_life ~ "continuous")
-  )
+  tbl_summary(
+    by = arm, 
+    type = 
+      list(
+        nb_partner_pastmonth ~ "continuous", 
+        nb_partner_life ~ "continuous"
+      )
+  )  |>
+  add_p(include = -c("site")) 
 
 ```
 

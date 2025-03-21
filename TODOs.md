@@ -1,12 +1,16 @@
 # VIBRANT primary trial analyses - TODO
 
-## January 14th
+
 
 1.  Raw to SE
 
 -   [ ] Add the weekly VIRGO metagenomics (because the analysis is based on the relative abundances as estimated by metagenomics instead of 16S).
 
--   [ ] Checks and QC ➞ total mg reads
+-   [ ] 
+
+-   [x] Checks and QC ➞ total mg reads
+
+
 
 -   [x] Pour les simulations ➞ k_sanity: il ne devrait pas y avoir de NA "completely random" (soit manquant pour toute la visite, soit pas manquant ➞ 0).
 

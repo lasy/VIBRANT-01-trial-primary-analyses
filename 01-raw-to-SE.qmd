@@ -119,7 +119,7 @@ LBP_strain_info <- readxl::read_xlsx(str_c(dropbox_dir(), "9_VIBRANT_Study Produ
 LBP_strain_info <- 
  LBP_strain_info |> 
   mutate(strain_id = `VMRC ID`, 
-         LBP = ifelse(is.na(LC106), "LC-106 & LC-115", "LC-106") |> factor(), 
+         LBP = ifelse(is.na(LC106), "LC-115", "LC-106 & LC-115") |> factor(), 
          strain_origin = `Geographic source` |> factor()
   ) |> 
   dplyr::rename(Biose_ID = `Biose ID`, VMRC_ID = `VMRC ID`) |> 
@@ -155,19 +155,20 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
     select(sample_id, everything()) |> 
     select(-c(pid, visit_code, barcode)) |> 
     as.data.frame() |> 
+    column_to_rownames("sample_id") |> 
     t() 
-  colnames(assay_prop_of_Lc) <- assay_prop_of_Lc[1, ]  
-  assay_prop_of_Lc <- assay_prop_of_Lc[-1, ]  
+  # colnames(assay_prop_of_Lc) <- assay_prop_of_Lc[1, ]  
+  # assay_prop_of_Lc <- assay_prop_of_Lc[-1, ]  
     
   assay_unique_kmers <- 
     mg_combined |> 
     # select(sample_id, strain, unique_kmers) |> 
     # pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
     select(sample_id, all_of(LBP_strain_info$strain_id), `Lactobacillus crispatus`) |> 
-    as.data.frame() |> 
+    as.data.frame() |>
+    column_to_rownames("sample_id") |>
     t()
-  colnames(assay_unique_kmers) <- assay_unique_kmers[1,]
-  assay_unique_kmers <- assay_unique_kmers[-1,]
+
   
   se_coldata <-
     mg |>
@@ -187,6 +188,9 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
       by = join_by(strain == strain_id)
     ) 
   
+  
+  # Harmonization of the order of samples and feature
+  
   sorted_sample_ids <- sort(as.character(se_coldata$sample_id))
   assay_prop_of_Lc <- assay_prop_of_Lc[, sorted_sample_ids]
   assay_unique_kmers <- assay_unique_kmers[, sorted_sample_ids]
@@ -194,17 +198,17 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
 
   # SummarizedExperiment does not run without this, I don't know why
   # To try again and remove if is it possible
-  sorted_strains <- sort(as.character(se_rowdata$strain))
+  sorted_strains <- assay_prop_of_Lc |> rownames() # sort(as.character(se_rowdata$strain))
   assay_prop_of_Lc <- assay_prop_of_Lc[sorted_strains, ]
   assay_unique_kmers <- assay_unique_kmers[sorted_strains, ]
   se_rowdata <- se_rowdata[match(sorted_strains, se_rowdata$strain), ]
 
-  rownames(assay_prop_of_Lc) <- as.character(rownames(assay_prop_of_Lc))
-  colnames(assay_prop_of_Lc) <- as.character(colnames(assay_prop_of_Lc))
-  rownames(assay_unique_kmers) <- as.character(rownames(assay_unique_kmers))
-  colnames(assay_unique_kmers) <- as.character(colnames(assay_unique_kmers))
-  se_rowdata$strain <- as.character(se_rowdata$strain)
-  se_coldata$sample_id <- as.character(se_coldata$sample_id)
+  # rownames(assay_prop_of_Lc) <- as.character(rownames(assay_prop_of_Lc))
+  # colnames(assay_prop_of_Lc) <- as.character(colnames(assay_prop_of_Lc))
+  # rownames(assay_unique_kmers) <- as.character(rownames(assay_unique_kmers))
+  # colnames(assay_unique_kmers) <- as.character(colnames(assay_unique_kmers))
+  # se_rowdata$strain <- as.character(se_rowdata$strain)
+  # se_coldata$sample_id <- as.character(se_coldata$sample_id)
 
   se_rowdata <- as(se_rowdata, "DataFrame")
   se_coldata <- as(se_coldata, "DataFrame")
