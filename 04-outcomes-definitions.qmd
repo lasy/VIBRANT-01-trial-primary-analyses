@@ -42,13 +42,13 @@ se_LBP_rel_abundances <-
         mae[["amplicon_ASV_all"]] |> 
           filter(str_detect(.feature, "crispatus")) |> 
           as_tibble() |> 
-          select(.sample, ASV_prop) |> 
+          dplyr::select(.sample, ASV_prop) |> 
           group_by(.sample) |> summarize(Lc_prop = sum(ASV_prop))
       ) |> 
       mutate(
         LBP_rel_ab = prop_of_Lc * Lc_prop
       ) |> 
-      select(-prop_of_Lc, -unique_kmers) 
+      dplyr::select(-prop_of_Lc, -unique_kmers) 
   )
 
 
@@ -95,8 +95,13 @@ colonization <-
   group_by(pid) |> 
   arrange(pid, visit_code) |>
   mutate(
-    colonized_by = cumsum(colonized_at) > 0
-  ) |> 
+    colonized_by = cummax(ifelse(is.na(colonized_at), FALSE, colonized_at)) |> as.logical()
+  )  |> 
+  
+  # mutate(
+  #   colonized_by = cumsum(colonized_at) > 0
+  # ) |> 
+  
   ungroup()
 
 ```
@@ -111,7 +116,7 @@ se_primary <-
     assays = list(
       primary = 
         colonization |> 
-        select(-pid, -visit_code) |> 
+        dplyr::select(-pid, -visit_code) |> 
         as.data.frame() |> 
         column_to_rownames(".sample") |> t()
     )

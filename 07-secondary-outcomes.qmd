@@ -195,7 +195,7 @@ LBP_strains_summary <-
   left_join(
     mae[["mg_ksanity"]] |> 
       as_tibble() |> 
-      select(.feature, LBP, strain_origin) |> 
+      dplyr::select(.feature, LBP, strain_origin) |> 
       distinct(),
     by = join_by(.feature)
   )
@@ -207,27 +207,27 @@ LBP_strains_summary <-
 #| fig-width: 12
 #| fig-height: 5
 
-LBP_strains_summary |> 
-  filter(arm != "Pl") |>
-  mutate(strain_origin = str_c("orgin: ", strain_origin)) |>
-  ggplot(aes(x = site, y = max_prop, col = site, fill = site)) +
-  ggbeeswarm::geom_quasirandom(alpha = 0.7) +
-  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
-  facet_grid(. ~ strain_origin + .feature) +
-  scale_color_manual(values = get_site_colors()) +
-  scale_fill_manual(values = get_site_colors()) +
-  scale_y_continuous(
-    str_c(
-      "Max. proportion of LBP strain\n",
-      "in active arms participants\n",
-      "at any weekly visit"),
-    labels = scales::percent, breaks = seq(0, 1, by = 0.05)
-    ) + expand_limits(y = 0) +
-  scale_x_discrete("", breaks = NULL) +
-  theme(
-    # strip.text.x = element_text(angle = 45),
-    legend.position = "bottom"
-  )
+# LBP_strains_summary |> 
+#   filter(arm != "Pl") |>
+#   mutate(strain_origin = str_c("orgin: ", strain_origin)) |>
+#   ggplot(aes(x = site, y = max_prop, col = site, fill = site)) +
+#   ggbeeswarm::geom_quasirandom(alpha = 0.7) +
+#   geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+#   facet_grid(. ~ strain_origin + .feature) +
+#   scale_color_manual(values = get_site_colors()) +
+#   scale_fill_manual(values = get_site_colors()) +
+#   scale_y_continuous(
+#     str_c(
+#       "Max. proportion of LBP strain\n",
+#       "in active arms participants\n",
+#       "at any weekly visit"),
+#     labels = scales::percent, breaks = seq(0, 1, by = 0.05)
+#     ) + expand_limits(y = 0) +
+#   scale_x_discrete("", breaks = NULL) +
+#   theme(
+#     # strip.text.x = element_text(angle = 45),
+#     legend.position = "bottom"
+#   )
 
 ```
 

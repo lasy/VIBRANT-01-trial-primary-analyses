@@ -72,7 +72,7 @@ mae_coldata <-
 make_se_clin <- function(clin, cols, assayname){
   assay <- 
     clin |> 
-    select(sample_id, all_of(cols)) |> 
+    dplyr::select(sample_id, all_of(cols)) |> 
     as.data.frame() |> 
     column_to_rownames("sample_id") |> 
     t()
@@ -86,12 +86,13 @@ make_se_clin <- function(clin, cols, assayname){
   
 }
 
-
 ```
 
 ```{r}
 
-clin <- clin |> mutate(planned = TRUE, attended = ifelse(str_detect(visit_name, "Daily"), NA, attended)) #TRUE
+# Directly included in data simulation 
+
+# clin <- clin |> mutate(planned = TRUE, attended = ifelse(str_detect(visit_name, "Daily"), NA, attended)) #TRUE
 
 ```
 
@@ -125,7 +126,7 @@ LBP_strain_info <-
   dplyr::rename(Biose_ID = `Biose ID`, VMRC_ID = `VMRC ID`) |> 
   arrange(strain_origin, LBP) |> 
   mutate(strain_id = strain_id |> fct_inorder()) |> 
-  select(strain_id, LBP, strain_origin, contains("ID"))
+  dplyr::select(strain_id, LBP, strain_origin, contains("ID"))
 
 LBP_strain_info |> gt(caption = "LBP strain information")
 
@@ -136,7 +137,7 @@ LBP_strain_info |> gt(caption = "LBP strain information")
 mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
   mg_manifest <- 
     mg_manifest |> 
-    mutate(sample_id = str_c(pid, "_", visit_code))
+    mutate(sample_id = str_c(pid, "_", visit_code)) # nécéssaire ? pourquoi pas "barcode" ccréer dans sim ? 
   
   if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
   
@@ -144,16 +145,15 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
   mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
   # mg_combined <- mg_combined |> filter(!is.na(`Lactobacillus crispatus`))
   mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode))
-  tmp <- mg |> select(barcode, sample_id) |> distinct()
+  tmp <- mg |> dplyr::select(barcode, sample_id) |> distinct()
   if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
   
   assay_prop_of_Lc <- 
     mg |> 
-    # select(sample_id, strain, prop_of_Lc) |> 
-    # the new database is already in wide format 
-    # pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |> 
-    select(sample_id, everything()) |> 
-    select(-c(pid, visit_code, barcode)) |> 
+    # dplyr::select(sample_id, strain, prop_of_Lc) |> 
+    # pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |>  # the new database is already in wide format 
+    dplyr::select(sample_id, everything()) |> 
+    dplyr::select(-c(pid, visit_code, barcode)) |> 
     as.data.frame() |> 
     column_to_rownames("sample_id") |> 
     t() 
@@ -162,23 +162,22 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
     
   assay_unique_kmers <- 
     mg_combined |> 
-    # select(sample_id, strain, unique_kmers) |> 
+    # dplyr::select(sample_id, strain, unique_kmers) |> 
     # pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
-    select(sample_id, all_of(LBP_strain_info$strain_id), `Lactobacillus crispatus`) |> 
+    dplyr::select(sample_id, all_of(LBP_strain_info$strain_id), `Lactobacillus crispatus`) |> 
     as.data.frame() |>
     column_to_rownames("sample_id") |>
     t()
 
-  
   se_coldata <-
     mg |>
-    select(sample_id, barcode) |> #shared_kmers
+    dplyr::select(sample_id, barcode) |> #shared_kmers
     distinct() |>
     as.data.frame()
 
   se_rowdata <- 
     mg |> 
-    select(-c(barcode, pid, visit_code, sample_id)) |> 
+    dplyr::select(-c(barcode, pid, visit_code, sample_id)) |> 
     colnames() |> 
     as.data.frame() |> 
     setNames("strain") |> 
@@ -196,19 +195,10 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
   assay_unique_kmers <- assay_unique_kmers[, sorted_sample_ids]
   se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sample_id), ]
 
-  # SummarizedExperiment does not run without this, I don't know why
-  # To try again and remove if is it possible
   sorted_strains <- assay_prop_of_Lc |> rownames() # sort(as.character(se_rowdata$strain))
   assay_prop_of_Lc <- assay_prop_of_Lc[sorted_strains, ]
   assay_unique_kmers <- assay_unique_kmers[sorted_strains, ]
   se_rowdata <- se_rowdata[match(sorted_strains, se_rowdata$strain), ]
-
-  # rownames(assay_prop_of_Lc) <- as.character(rownames(assay_prop_of_Lc))
-  # colnames(assay_prop_of_Lc) <- as.character(colnames(assay_prop_of_Lc))
-  # rownames(assay_unique_kmers) <- as.character(rownames(assay_unique_kmers))
-  # colnames(assay_unique_kmers) <- as.character(colnames(assay_unique_kmers))
-  # se_rowdata$strain <- as.character(se_rowdata$strain)
-  # se_coldata$sample_id <- as.character(se_coldata$sample_id)
 
   se_rowdata <- as(se_rowdata, "DataFrame")
   se_coldata <- as(se_coldata, "DataFrame")
@@ -319,14 +309,7 @@ phyloseq_to_SE <- function(physeq){
 ```
 
 
-
-
-
-
 #### Checks & Quality Controls
-
-
-
 
 **16S Total reads per sample**
 

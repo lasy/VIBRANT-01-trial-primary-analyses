@@ -33,13 +33,13 @@ available_data <-
       as_tibble() |> 
       filter(assay != "visit_attendance") |> 
       mutate(.sample = primary) |> 
-      select(.sample, assay) |> 
-      mutate(available_data = TRUE),
+      dplyr::select(.sample, assay),
     by = join_by(.sample)
   ) |> 
   left_join(
-    mae@colData |> as_tibble() |> select(.sample, pid, site, arm, starts_with("visit_"))
-  )
+    mae@colData |> as_tibble() |> dplyr::select(.sample, pid, site, arm, starts_with("visit_"))
+  ) |> 
+  mutate(available_data = ifelse(attended == FALSE, FALSE, TRUE))
 
 assay_collection_schedule <- 
   available_data |> 
@@ -59,6 +59,9 @@ available_data <-
   available_data |> 
   filter(assay_scheduled_at_visit) 
 
+available_data
+
+
 ```
 
 ```{r}
@@ -66,6 +69,7 @@ available_data <-
 #| fig-width: 7
 
 available_data |> 
+  filter(attended == TRUE) |>  # ou available_data == TRUE
   ggplot(aes(x = assay, y = pid, col = assay)) +
   geom_point() +
   facet_grid(arm + site ~ visit_code, scales = "free", space = "free") +
@@ -80,6 +84,23 @@ While it is possible for a few Placebo participants to natively have strains tha
 We thus check how many LBP strains are simultaneously present in the Placebo participants samples 
 
 > TODO
+
+```{r}
+
+mae[["mg_ksanity"]] |> 
+  left_join(
+    colData(mae) |> 
+      as.tibble() |> 
+      dplyr::select(.sample, site, arm, visit_code, pid), 
+    by = ".sample"
+  ) |> 
+  filter(arm == "Pl" & !is.na(LBP)) |> 
+  ggplot(aes(x = pid, y = unique_kmers, color = strain)) + 
+  geom_point() + 
+  facet_grid(visit_code ~ strain, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
 
 
 ### Other checks ?

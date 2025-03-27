@@ -23,7 +23,7 @@ editor: source
 
 
 ```{r}
-
+#simulation
 col_by_week5 <- 
   expand_grid(
     site = c("MGH", "CAP") |> factor(),
@@ -103,7 +103,7 @@ summary_table |>
     LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
     CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
   ) |> 
-  select(
+  dplyr::select(
     site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
   ) |> 
   pivot_longer(-c(site, arm)) |>
@@ -158,11 +158,11 @@ tmp <-
   col_by_week5 |> 
   bind_rows(
     col_by_week5 |> 
-      select(arm, site) |> 
+      dplyr::select(arm, site) |> 
       distinct() |> 
       mutate(colonized_by = TRUE),
     col_by_week5 |> 
-      select(arm, site) |> 
+      dplyr::select(arm, site) |> 
       distinct() |> 
       mutate(colonized_by = FALSE)
   ) |> 
@@ -211,7 +211,7 @@ for (selected_site in levels(col_by_week5$site)) {
       col_by_week5 |>
       filter(site == selected_site, arm %in% c("Pl", selected_arm)) |>
       mutate(arm = arm |> fct_drop()) |>
-      select(colonized_by, arm) |>
+      dplyr::select(colonized_by, arm) |>
       table() |>
       fisher.test()
     fisher_test_res <-
