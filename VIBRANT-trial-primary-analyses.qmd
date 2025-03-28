@@ -125,9 +125,9 @@ mae
 
 ## Demographics (Table 1)
 
-> TODO
+```{r child = '05-Demographics.qmd'}
+```
 
-See https://www.danieldsjoberg.com/gtsummary/
 
 
 ## Primary outcomes (Table 2)
