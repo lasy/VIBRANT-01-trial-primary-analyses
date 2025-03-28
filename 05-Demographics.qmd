@@ -18,23 +18,146 @@ knitr:
 editor: source
 ---
 
-In this section we will create a table with the demographics of the participants in the study. 
+### Summary table 
 
+We create two summary table : one by arms and one by sites.
+
+```{r}
+
+participants_bis <- 
+  participants |>
+  mutate(
+    across(where(is.character), as.factor),
+    arm = fct_recode(
+      arm,
+      Placebo = "Pl",
+      `LC106 7 days` = "LC-106-7",
+      `LC106 3 days` = "LC-106-3",
+      `LC106 overlap` = "LC-106-o",
+      `LC115 7 days` = "LC-115"
+    ), 
+    site = fct_recode(
+      site, 
+      MGH = "MGH", 
+      VCRS = "CAP"
+    )
+  ) |>
+  set_variable_labels(
+    food_insecurity = "Report food insecurity in past 12 months ",
+    gender_sexual_partners = "Gender of sexual partners",
+    nb_partner_pastmonth = "Number of partners in past month",
+    nb_partner_life = "Number of partners in lifetime"
+  ) |>
+  rename_with(~ str_to_title(.x)) 
+
+```
 
 
 ```{r}
 
-participants |> 
-  select(-c("pid", "dropout_time"))  |> 
+participants_bis |>
+  select(-c("Pid", "Dropout_time"))  |>
+  mutate(
+    Arm = fct_recode(
+      Arm,
+      Placebo = "Placebo",
+      `LC106 <br> 7 days` = "LC106 7 days",
+      `LC106 <br> 3 days` = "LC106 3 days",
+      `LC106 <br> overlap` = "LC106 overlap",
+      `LC115 <br> 7 days` = "LC115 7 days"
+    )) |> 
   tbl_summary(
-    by = arm, 
-    type = 
+    by = Arm,
+    type =
       list(
-        nb_partner_pastmonth ~ "continuous", 
-        nb_partner_life ~ "continuous"
-      )
+        Nb_partner_pastmonth ~ "continuous",
+        Nb_partner_life ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
   )  |>
-  add_p(include = -c("site")) 
+  modify_spanning_header(all_stat_cols() ~ "**Treatment Received**") |>
+  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
+    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
+    tibble::tibble(p.value = result$p.value)},
+    include = -c("Site")
+    ) |> 
+  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
+
+# add_p(test = all_categorical() ~ "chisq.test")
+
 
 ```
+
+```{r}
+
+participants_bis |> 
+  select(-c("Pid", "Dropout_time")) |> 
+  tbl_summary(
+    by = Site,
+    type =
+      list(
+        Nb_partner_pastmonth ~ "continuous",
+        Nb_partner_life ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  )  |>
+  modify_spanning_header(all_stat_cols() ~ "**Sites**") |>
+  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
+    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
+    tibble::tibble(p.value = result$p.value)}
+    ) |> 
+  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
+
+```
+
+### Graphics 
+
+```{r}
+
+cat_vars <- 
+  participants_bis |> 
+  select(where(is.factor) | where(is.character),
+         - "Pid") |> 
+  names()
+
+num_vars <- participants_bis |> 
+  select(where(is.numeric) | where(is.integer))|> 
+  names()
+
+for (var in cat_vars) {
+  var_label <- var_label(participants_bis[[var]])
+  var_label <- ifelse(!is.null(var_label), var_label, var)
+  
+  p <- ggplot(participants_bis, aes_string(x = var, fill = "Site")) +
+    geom_bar(position = "dodge") +
+    theme_classic() +
+    theme(plot.title = element_text(hjust=0.5))+
+    scale_x_discrete(labels = wrap_format(10)) +
+    labs(title = paste("Distribution of", tolower(var_label), "by arm"), x = var_label)
+  print(p)
+}
+
+
+for (var in num_vars) {
+  var_label <- var_label(participants_bis[[var]])
+  var_label <- ifelse(!is.null(var_label), var_label, var)
+  
+  p <- ggplot(participants_bis, aes_string(y = var, x = "Site", color = "Site")) +
+    geom_boxplot() +
+    theme_classic() +
+    theme(plot.title = element_text(hjust=0.5))+
+    scale_x_discrete(labels = wrap_format(10)) +
+    labs(title = paste("Distribution of", tolower(var_label), "by arm"), x = var_label)
+  print(p)
+}
+
+```
+
+
 
