@@ -39,11 +39,11 @@ se_LBP_rel_abundances <-
       mae[["mg_ksanity"]] |> 
       filter(!is.na(LBP)) |> 
       left_join(
-        mae[["amplicon_ASV_all"]] |> 
+        mae[["mg_virgo2"]] |> 
           filter(str_detect(.feature, "crispatus")) |> 
           as_tibble() |> 
-          dplyr::select(.sample, ASV_prop) |> 
-          group_by(.sample) |> summarize(Lc_prop = sum(ASV_prop))
+          dplyr::select(.sample, virgo2_prop) |> 
+          group_by(.sample) |> summarize(Lc_prop = sum(virgo2_prop))
       ) |> 
       mutate(
         LBP_rel_ab = prop_of_Lc * Lc_prop

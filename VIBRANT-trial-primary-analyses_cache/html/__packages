@@ -26,3 +26,6 @@ Rcpp
 brms
 phyloseq
 gtsummary
+labelled
+scales
+ggpubr

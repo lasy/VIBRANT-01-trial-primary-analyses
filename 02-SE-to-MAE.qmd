@@ -46,6 +46,11 @@ se_va
 se_mg
 ```
 
+#### Weekly metagenomics VIRGO2 data 
+
+```{r}
+se_mg_Virgo2
+```
 
 
 #### Weekly 16S rRNA data
@@ -64,9 +69,10 @@ assay_list <-
   list(
     visit_attendance = se_va,
     mg_ksanity = se_mg,
-    # mg_virgo2 = se_mg_V,
+    mg_virgo2 = se_mg_Virgo2,
     amplicon_ASV_all = se_16S
     )
+
 
 mae <- 
   MultiAssayExperiment::MultiAssayExperiment(

@@ -1,0 +1,141 @@
+---
+title: "Purgatory"
+author: Laura Symul & Laura Vermeren
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+# 01-raw-to-SE
+
+## 03.04.2025
+
+Change in the function mg_to_SE : 
+-   Add rows for samples of missed visits (need informations in "clin" database)
+
+```{r}
+mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info){
+  mg_manifest <- 
+    mg_manifest |> 
+    mutate(sample_id = str_c(pid, "_", visit_code)) 
+  
+  if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
+  
+  # mg <- mg |> filter(!is.na(`Lactobacillus crispatus`)) 
+  mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
+  # mg_combined <- mg_combined |> filter(!is.na(`Lactobacillus crispatus`))
+  mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode))
+  tmp <- mg |> dplyr::select(barcode, sample_id) |> distinct()
+  if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
+  
+  assay_prop_of_Lc <- 
+    mg |> 
+    # dplyr::select(sample_id, strain, prop_of_Lc) |> 
+    # pivot_wider(names_from = sample_id, values_from = prop_of_Lc, values_fill = 0) |>  # the new database is already in wide format 
+    dplyr::select(sample_id, everything()) |> 
+    dplyr::select(-c(pid, visit_code, barcode)) |> 
+    as.data.frame() |> 
+    column_to_rownames("sample_id") |> 
+    t() 
+  # colnames(assay_prop_of_Lc) <- assay_prop_of_Lc[1, ]  
+  # assay_prop_of_Lc <- assay_prop_of_Lc[-1, ]  
+    
+  assay_unique_kmers <- 
+    mg_combined |> 
+    # dplyr::select(sample_id, strain, unique_kmers) |> 
+    # pivot_wider(names_from = sample_id, values_from = unique_kmers, values_fill = 0) |> 
+    dplyr::select(sample_id, all_of(LBP_strain_info$strain_id), `Lactobacillus crispatus`) |> 
+    as.data.frame() |>
+    column_to_rownames("sample_id") |>
+    t()
+
+  se_coldata <-
+    mg |>
+    dplyr::select(sample_id, barcode) |> #shared_kmers
+    distinct() |>
+    as.data.frame()
+
+  se_rowdata <- 
+    mg |> 
+    dplyr::select(-c(barcode, pid, visit_code, sample_id)) |> 
+    colnames() |> 
+    as.data.frame() |> 
+    setNames("strain") |> 
+    distinct() |> 
+    left_join(
+      LBP_strain_info,
+      by = join_by(strain == strain_id)
+    ) 
+  
+  
+  # Harmonization of the order of samples and feature
+  
+  sorted_sample_ids <- sort(as.character(se_coldata$sample_id))
+  assay_prop_of_Lc <- assay_prop_of_Lc[, sorted_sample_ids]
+  assay_unique_kmers <- assay_unique_kmers[, sorted_sample_ids]
+  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sample_id), ]
+
+  sorted_strains <- assay_prop_of_Lc |> rownames() # sort(as.character(se_rowdata$strain))
+  assay_prop_of_Lc <- assay_prop_of_Lc[sorted_strains, ]
+  assay_unique_kmers <- assay_unique_kmers[sorted_strains, ]
+  se_rowdata <- se_rowdata[match(sorted_strains, se_rowdata$strain), ]
+
+  se_rowdata <- as(se_rowdata, "DataFrame")
+  se_coldata <- as(se_coldata, "DataFrame")
+
+  SummarizedExperiment::SummarizedExperiment(
+    assays = list(prop_of_Lc = assay_prop_of_Lc, unique_kmers = assay_unique_kmers),
+    rowData = se_rowdata,
+    colData = se_coldata
+  )
+}
+
+
+```
+
+# 04-outcomes-definitions
+
+## 04.04.2025
+
+### LBP strains relative abundances in each samples
+
+We replace "amlicon_ASV_all" by "mg-Virgo2" in the code below.
+
+```{r}
+
+se_LBP_rel_abundances <- 
+  list(
+    LBP_rel_ab = 
+      mae[["mg_ksanity"]] |> 
+      filter(!is.na(LBP)) |> 
+      left_join(
+        mae[["amplicon_ASV_all"]] |> 
+          filter(str_detect(.feature, "crispatus")) |> 
+          as_tibble() |> 
+          dplyr::select(.sample, ASV_prop) |> 
+          group_by(.sample) |> summarize(Lc_prop = sum(ASV_prop))
+      ) |> 
+      mutate(
+        LBP_rel_ab = prop_of_Lc * Lc_prop
+      ) |> 
+      dplyr::select(-prop_of_Lc, -unique_kmers) 
+  )
+
+
+mae <- c(mae, se_LBP_rel_abundances)
+
+
+```
+
