@@ -20,12 +20,37 @@ editor: source
 
 ### Summary table 
 
+We created the variable *food_insecurity* based on the variables *cut_size_meals*, *eat_less*, and *hungry_did_not_eat* (questions 16, 17, and 18 from CRF 12). The variable *food_insecurity* is set to *yes* if the response to at least one of these three questions is *yes*.
+
+```{r}
+
+participants <- 
+  participants |> 
+  mutate(
+    food_insecurity = ifelse(
+      cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
+      "Yes",
+      "No"
+    ),
+    food_insecurity = factor(food_insecurity, levels = c("No", "Yes"))
+  )
+
+participants |> 
+  ggplot(aes(x = food_insecurity)) +
+  geom_bar() +
+  labs(x= "Food insecurity", y = "Count")+
+  theme_classic()
+
+```
+
+
 We create two summary table : one by arms and one by sites.
 
 ```{r}
 
 participants_bis <- 
   participants |>
+  select(-c(eat_less, cut_size_meals, hungry_did_not_eat)) |>
   mutate(
     across(where(is.character), as.factor),
     arm = fct_recode(
@@ -45,9 +70,10 @@ participants_bis <-
   set_variable_labels(
     food_insecurity = "Report food insecurity in past 12 months ",
     gender_sexual_partners = "Gender of sexual partners",
-    nb_partner_pastmonth = "Number of partners in past month",
-    nb_partner_life = "Number of partners in lifetime", 
-    dropout_time = "Dropout time"
+    sexual_partners_past_month = "Number of partners in past month",
+    sexual_partners_lifetime = "Number of partners in lifetime", 
+    dropout_time = "Dropout time",
+    eth = "Ethnicity"
   ) |>
   rename_with(~ str_to_title(.x)) 
 
@@ -71,11 +97,11 @@ participants_bis |>
     by = Arm,
     type =
       list(
-        Nb_partner_pastmonth ~ "continuous",
-        Nb_partner_life ~ "continuous"
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({sd})",
+      all_continuous() ~ "{mean} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
   )  |>
@@ -100,8 +126,8 @@ participants_bis |>
     by = Site,
     type =
       list(
-        Nb_partner_pastmonth ~ "continuous",
-        Nb_partner_life ~ "continuous"
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
       all_continuous() ~ "{mean} ({sd})",
@@ -118,6 +144,31 @@ participants_bis |>
 ```
 
 ### Graphics 
+
+```{r}
+
+
+ggplot(participants_bis, aes(x = Age, fill = Site, col = Site)) +
+  geom_histogram(alpha = 0.5, position = "identity") +
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2) +
+    theme_classic() 
+  
+participants_bis$Gender_sexual_partners
+  
+    
+ggplot(participants_bis, aes(x = Gender_sexual_partners, fill = Site)) +
+    geom_bar(position = "dodge") +
+    theme_classic() +
+    scale_fill_manual(values = custom_colors) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_x_discrete(labels = wrap_format(10)) +
+    labs(x = str_wrap(var_label, width = 17), y="") 
+
+```
+
 
 ```{r}
 
@@ -149,7 +200,8 @@ for (var in cat_vars) {
     scale_x_discrete(labels = wrap_format(10)) +
     labs(x = str_wrap(var_label, width = 17), y="") 
   
-  plots[[var]] <- p
+  #plots[[var]] <- p
+  print(p)
 }
 
 for (var in num_vars) {
@@ -157,19 +209,23 @@ for (var in num_vars) {
   var_label <- ifelse(!is.null(var_label), var_label, var)
   
   p <- 
-    ggplot(participants_bis, aes_string(y = var, x = "Site", color = "Site")) +
-    geom_boxplot() +
+    ggplot(participants_bis, aes_string(x = var, fill = "Site", col = "Site")) +
+    geom_histogram(alpha = 0.5, position = "identity") +
+    # geom_density(lwd = 1.2,
+    #            linetype = 2,
+    #            colour = 2) +
     theme_classic() +
+    scale_fill_manual(values = custom_colors) +  
     scale_color_manual(values = custom_colors) +  
     theme(plot.title = element_text(hjust = 0.5)) +
-    scale_x_discrete(labels = wrap_format(10)) +
     labs(y = str_wrap(var_label, width = 17))  
   
-  plots[[var]] <- p
+  #plots[[var]] <- p
+  print(p)
 }
 
 
-ggarrange(plotlist = plots, ncol = 2, nrow = ceiling(length(plots)/2))
+# ggarrange(plotlist = plots, ncol = 2, nrow = ceiling(length(plots)/2))
 
 ```
 ```{r}
@@ -177,13 +233,15 @@ ggarrange(plotlist = plots, ncol = 2, nrow = ceiling(length(plots)/2))
 p1 <- participants_bis |> 
   ggplot(aes(x=Race))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   labs(y="") +
-  facet_grid(Site~Arm)
+  facet_grid(Site~Arm) 
 
 p2 <- participants_bis |> 
   ggplot(aes(x=Food_insecurity))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   labs(y="", x = var_label(participants_bis$Food_insecurity)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
@@ -199,36 +257,50 @@ p3 <- participants_bis |>
 p4 <- participants_bis |> 
   ggplot(aes(x=Gender_sexual_partners))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   labs(y="", x = var_label(participants_bis$Gender_sexual_partners)) +
   facet_grid(Site~Arm)
 
 p5 <- participants_bis |> 
-  ggplot(aes(x=Nb_partner_pastmonth))+ 
+  ggplot(aes(x=Sexual_partners_past_month))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  labs(y="", x = var_label(participants_bis$Nb_partner_pastmonth)) +
+  labs(y="", x = var_label(participants_bis$Sexual_partners_past_month)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
   facet_grid(Site~Arm)
 
 p6 <- participants_bis |> 
-  ggplot(aes(x=Nb_partner_life))+ 
+  ggplot(aes(x=Sexual_partners_lifetime))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  labs(y="", x = var_label(participants_bis$Nb_partner_life)) +
+  labs(y="", x = var_label(participants_bis$Sexual_partners_lifetime)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
   facet_grid(Site~Arm)
 
 p7 <- participants_bis |> 
   ggplot(aes(x=Dropout))+ 
   geom_bar() + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   labs(y="") +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
-  facet_grid(Site~Arm)
+  facet_grid(Site~Arm) + 
+  theme(
+  axis.text.x = element_text(angle = 90, hjust = 1),
+  plot.margin = margin(t = 5, r = 5, b = 30, l = 5)  # bas = 30 points
+)
 
-ggarrange(p1, p2, p4, p5, p6, p7, p3, ncol=4, nrow=2)
-
+#ggarrange(p1, p2, p4, p5, p6, p7, p3, ncol=4, nrow=2) 
+p1
+p2
+p3
+p4
+p5
+p6
+p7
 
 ```
 

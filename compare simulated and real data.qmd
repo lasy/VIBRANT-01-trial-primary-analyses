@@ -1,0 +1,57 @@
+---
+title: "Compare simulation and real data"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+
+theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+
+```
+
+## Import data
+
+```{r}
+# Import simulation data
+
+data_source <- "simulated"
+
+mg.sim <- read_csv(str_c(data_dir(), "01 metagenomics kSanity/mg_kSanity.csv"))
+
+mg_combined.sim <- read_csv(str_c(data_dir(), "03 metagenomics combined/mg_combined.csv"))
+
+# Import real data
+mg_readcount.real <- read_csv("C:/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/20250404/MVIBR_kSanityVIRGO2_ReadCounts_20250404.csv")
+
+mg_relab.real <- read_csv("C:/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/20250404/MVIBR_kSanityVIRGO2_relAbund_20250404.csv")
+
+mg_taxaGLcor <- read_csv("C:/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/20250404/MVIBR_kSanityVIRGO2_taxaGLcor_20250404.csv")
+
+```
+
+```{r}
+
+mg_readcount.real <- 
+  mg_readcount.real |>
+  mutate(
+    tot_sum = rowSums(across(-c(sampleID, CST, subCST, score))),
+  ) |> 
+  select(
+    sampleID, CST, subCST, score, tot_sum,everything()
+  )
+
+mg_relab.real <- 
+  mg_relab.real |>
+  mutate(
+    tot_sum = rowSums(across(-c(sampleID, CST, subCST, score))),
+  ) |> 
+  select(
+    sampleID, CST, subCST, score, tot_sum,everything()
+  )
+
+```

@@ -12,12 +12,24 @@ data_dir <- function(data_source = c("simulated", "real")){
 
     data_dir <- data_dir |> str_c("simulated data/")
     data_dir <- fs::dir_ls(data_dir) |> sort(decreasing = TRUE) |> magrittr::extract(1) |> str_c("/")
-  } else {
-    stop("The `R/data_dir.R` needs to be modified to specify the path to the real data directory.")
+  } 
+  
+  else if (data_source == "real"){
+    if (str_detect(getwd(), "laurasymul"))
+      data_dir <- "/Users/laurasymul/OneDrive - UCL/Academia/Research/VIBRANT data UCLouvain/"
+    else if (str_detect(getwd(), "vermeren"))
+      data_dir <- "/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/"
+    else
+      stop("You need to specify the path to the data directory in `R/data_dir.R`")
+    
+    data_dir <- data_dir |> str_c("actual data/")
+    data_dir <- fs::dir_ls(data_dir) |> sort(decreasing = TRUE) |> magrittr::extract(1) |> str_c("/")
   }
-
+  else
+    stop("The `data_source` argument must be either 'simulated' or 'real'.")
   data_dir
 }
+
 
 
 dropbox_dir <- function(){

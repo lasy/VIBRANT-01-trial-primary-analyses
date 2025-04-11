@@ -56,8 +56,8 @@ visits <- readRDS(file = str_c(data_dir(), "00 clinical data/visits.RDS"))
 
 clin <- 
   participants |> left_join(visits, by = join_by(pid)) |> 
-  mutate(sample_id = str_c(pid, "_", visit_code), rownames = sample_id) |> 
-  dplyr::select(sample_id, everything()) 
+  mutate(sampleID = str_c(pid, "_", visit_code), rownames = sampleID) |> 
+  dplyr::select(sampleID, everything()) 
 
 mae_coldata <- 
   clin |> 
@@ -72,9 +72,9 @@ mae_coldata <-
 make_se_clin <- function(clin, cols, assayname){
   assay <- 
     clin |> 
-    dplyr::select(sample_id, all_of(cols)) |> 
+    dplyr::select(sampleID, all_of(cols)) |> 
     as.data.frame() |> 
-    column_to_rownames("sample_id") |> 
+    column_to_rownames("sampleID") |> 
     t()
   
   assay_list <- list()
@@ -112,9 +112,28 @@ We load the weekly metagenomics data, the manifest for the metagenomic barcodes,
 
 ```{r}
 
+# if simulated data
+
 mg <- read_csv(str_c(data_dir(), "01 metagenomics kSanity/mg_kSanity.csv"))
 mg_combined <- read_csv(str_c(data_dir(), "03 metagenomics combined/mg_combined.csv"))
 mg_manifest <- read_csv(str_c(data_dir(), "01 metagenomics kSanity/mg_kSanity_manifest.csv"))
+
+# if real data 
+
+# mg <- read_csv(str_c(data_dir("real"), "MVIBR_kSanityVIRGO2_ReadCounts_20250404.csv"))
+# mg_combined <- read_csv(str_c(data_dir("real"), "MVIBR_kSanityVIRGO2_relAbund_20250404.csv"))
+# 
+# # Create a fake manifest (waiting the real one)
+# mg_manifest <- 
+#   mg |>
+#   mutate(
+#     visit_code_temp = substr(sampleID, 4, nchar(sampleID) - 2 ),
+#     visit_code = substr(visit_code_temp, 1, 3) |> as.factor(),
+#     pid = substr(sampleID, nchar(sampleID) - 1, nchar(sampleID)) |> as.factor(),
+#   ) |> 
+#   select(sampleID, pid, visit_code)
+
+# strain info 
 LBP_strain_info <- readxl::read_xlsx(str_c(dropbox_dir(), "9_VIBRANT_Study Product/IsolateNumbers.xlsx"))
 
 LBP_strain_info <- 
@@ -130,7 +149,7 @@ LBP_strain_info <-
 
 LBP_strain_info |>   # gt(caption = "LBP strain information")
   set_variable_labels(
-    strain_id = "Stain ID", 
+    strain_id = "Strain ID", 
     strain_origin = "Strain origin", 
     Biose_ID = "Biose ID", 
     VMRC_ID = "VMRC ID"
@@ -144,59 +163,44 @@ LBP_strain_info |>   # gt(caption = "LBP strain information")
 ```{r}
 
 mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info, clin){
-  mg_manifest <- 
-    mg_manifest |> 
-    mutate(sample_id = str_c(pid, "_", visit_code)) 
+
+  mg_manifest <-
+    mg_manifest |>
+    mutate(sampleID = str_c(pid, "_", visit_code))
   
-  if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
+  if (any(duplicated(mg_manifest$sampleID))) stop("Duplicated `uid` in `mg_manifest`")
   
   mg <- mg |> left_join(mg_manifest, by = join_by(barcode))
-  mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode))
+  mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode)) 
   
-  tmp <- mg |> dplyr::select(barcode, sample_id) |> distinct()
-  if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg`")
-  
-  # Add NA lines for missing samples
-  all_sample_ids <- 
-    clin |> 
-    filter(!str_detect(visit_name, "Daily"), visit_abbr != "ST", day >= 0) |>  
-    select(sample_id) |> 
-    distinct() |> 
-    pull()
-  
-  mg <- 
-    mg |>   
-    tidyr::complete(sample_id = all_sample_ids)
-  
-  mg_combined <- 
-    mg_combined |>  
-    complete(sample_id = all_sample_ids)
+  tmp <- mg |> dplyr::select(barcode, sampleID) |> distinct()
+  if (any(duplicated(tmp$sampleID))) stop("Duplicated `uid` in `mg`")
   
   # create assays
   assay_prop_of_Lc <- 
     mg |> 
-    dplyr::select(sample_id, everything()) |> 
-    dplyr::select(-c(pid, visit_code, barcode)) |> 
+    dplyr::select(sampleID, everything()) |> #sample_id
+    dplyr::select(-c(barcode, pid, visit_code)) |>
     as.data.frame() |> 
-    column_to_rownames("sample_id") |> 
+    column_to_rownames("sampleID") |> #sample_id 
     t() 
 
   assay_unique_kmers <- 
     mg_combined |> 
-    dplyr::select(sample_id, all_of(LBP_strain_info$strain_id)) |>  # `Lactobacillus crispatus` 
+    dplyr::select(sampleID, all_of(LBP_strain_info$strain_id)) |> #sample_id # `Lactobacillus crispatus` 
     as.data.frame() |>
-    column_to_rownames("sample_id") |>
+    column_to_rownames("sampleID") |> #sampleID
     t()
 
   se_coldata <-
     mg |>
-    dplyr::select(sample_id, barcode) |> #shared_kmers
+    dplyr::select(sampleID, barcode) |> #shared_kmers
     distinct() |>
     as.data.frame()
 
   se_rowdata <- 
     mg |> 
-    dplyr::select(-c(barcode, pid, visit_code, sample_id)) |> 
+    dplyr::select(-c(barcode, pid, visit_code, sampleID)) |>
     colnames() |> 
     as.data.frame() |> 
     setNames("strain") |> 
@@ -208,10 +212,10 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info, clin){
   
   # Harmonization of the order of samples and feature
   
-  sorted_sample_ids <- sort(as.character(se_coldata$sample_id))
+  sorted_sample_ids <- sort(as.character(se_coldata$sampleID))
   assay_prop_of_Lc <- assay_prop_of_Lc[, sorted_sample_ids]
   assay_unique_kmers <- assay_unique_kmers[, sorted_sample_ids]
-  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sample_id), ]
+  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sampleID), ]
 
   sorted_strains <- assay_prop_of_Lc |> rownames() # sort(as.character(se_rowdata$strain))
   assay_prop_of_Lc <- assay_prop_of_Lc[sorted_strains, ]
@@ -231,7 +235,7 @@ mg_to_SE <- function(mg,mg_combined, mg_manifest, LBP_strain_info, clin){
 
 ```{r}
 
-(se_mg <- mg_to_SE(mg,mg_combined,  mg_manifest, LBP_strain_info, clin))
+(se_mg <- mg_to_SE(mg,mg_combined,mg_manifest, LBP_strain_info, clin))
 
 ```
 
@@ -284,33 +288,21 @@ Results of the metagenomics VIRGO2 is stored in a combined file with kSanity *kS
 mgVirgo_to_SE <- function(mg_combined, mg_manifest, LBP_strain_info, clin){
   mg_manifest <- 
     mg_manifest |> 
-    mutate(sample_id = str_c(pid, "_", visit_code)) 
+    mutate(sampleID = str_c(pid, "_", visit_code)) 
   
-  if (any(duplicated(mg_manifest$sample_id))) stop("Duplicated `uid` in `mg_manifest`")
+  if (any(duplicated(mg_manifest$sampleID))) stop("Duplicated `uid` in `mg_manifest`")
   
   mg_combined <- mg_combined |> left_join(mg_manifest, by = join_by(barcode))
   
-  tmp <- mg_combined |> dplyr::select(barcode, sample_id) |> distinct()
-  if (any(duplicated(tmp$sample_id))) stop("Duplicated `uid` in `mg_combined`")
-  
-  # Add NA lines for missing samples
-  all_sample_ids <- 
-    clin |> 
-    filter(!str_detect(visit_name, "Daily"), visit_abbr != "ST", day >= 0) |>  
-    select(sample_id) |> 
-    distinct() |> 
-    pull()
-  
-  mg_combined <- 
-    mg_combined |>  
-    complete(sample_id = all_sample_ids)
+  tmp <- mg_combined |> dplyr::select(barcode, sampleID) |> distinct()
+  if (any(duplicated(tmp$sampleID))) stop("Duplicated `uid` in `mg_combined`")
   
   # create assays
   assay <- 
     mg_combined |> 
-    dplyr::select(sample_id, !all_of(LBP_strain_info$strain_id), -c(barcode, visit_code, pid, total_reads)) |> 
+    dplyr::select(sampleID, !all_of(LBP_strain_info$strain_id), -c(barcode, visit_code, pid, total_reads)) |> 
     as.data.frame() |>
-    column_to_rownames("sample_id") |>
+    column_to_rownames("sampleID") |>
     t()
   
   # Relative abundance 
@@ -318,7 +310,7 @@ mgVirgo_to_SE <- function(mg_combined, mg_manifest, LBP_strain_info, clin){
 
   se_coldata <-
     mg_combined |>
-    dplyr::select(sample_id, barcode, total_reads) |> 
+    dplyr::select(sampleID, barcode, total_reads) |> 
     distinct() |>
     as.data.frame()
 
@@ -328,7 +320,7 @@ mgVirgo_to_SE <- function(mg_combined, mg_manifest, LBP_strain_info, clin){
       barcode,
       pid,
       visit_code,
-      sample_id,
+      sampleID,
       total_reads,
       all_of(LBP_strain_info$strain_id)
     )) |>
@@ -340,10 +332,10 @@ mgVirgo_to_SE <- function(mg_combined, mg_manifest, LBP_strain_info, clin){
   
   # Harmonization of the order of samples and feature
   
-  sorted_sample_ids <- sort(as.character(se_coldata$sample_id))
+  sorted_sample_ids <- sort(as.character(se_coldata$sampleID))
   assay <- assay[, sorted_sample_ids]
   rel <- rel[, sorted_sample_ids]
-  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sample_id), ]
+  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sampleID), ]
 
   sorted_strains <- assay |> rownames() 
   assay <- assay[sorted_strains, ]
@@ -407,17 +399,17 @@ phyloseq_to_SE <- function(physeq){
     set_class("data.frame") |> 
     rownames_to_column("barcode") |> 
     as_tibble() |> 
-    mutate(sample_id = str_c(pid, "_", visit_code))
+    mutate(sampleID = str_c(pid, "_", visit_code))
 
   counts <- physeq@otu_table |> as.data.frame() |> set_class("data.frame")
   if (!phyloseq::taxa_are_rows(physeq)) counts <- counts |> t()
-  counts <- counts |> set_colnames(sample_info$sample_id)
+  counts <- counts |> set_colnames(sample_info$sampleID)
   rel <- t(t(counts)/colSums(counts)) |> as.data.frame()
   
   SummarizedExperiment::SummarizedExperiment(
     assays = list(ASV_counts = counts, ASV_prop = rel),
     rowData = physeq@tax_table |> as.data.frame() |> set_class("data.frame"),
-    colData = sample_info |> as.data.frame() |> column_to_rownames("sample_id")
+    colData = sample_info |> as.data.frame() |> column_to_rownames("sampleID")
   )
 }
 
