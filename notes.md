@@ -1,3 +1,6 @@
+## Notes on differences between arms tests
+
+
 
 When running a logistic regression, having 0 successes in the control group can significantly reduce the power of your analysis. Here’s why:
 
