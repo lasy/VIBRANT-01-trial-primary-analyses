@@ -438,11 +438,31 @@ mg_readcount_long |>
   scale_x_log10()
 
 ```
+
+
+```{r}
+
+total_reads <- 
+ mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |> dplyr::rename(sampleID = UID) 
+  )
+
+
+total_reads |> 
+  ggplot(aes(x = total_count, fill = SampleType)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
 Proportion of 0
 ```{r}
 # proportion of zero 
 (mg_readcount_long$readcounts == 0)  |> mean()
 ```
+
 ```{r}
 
 mg_readcount_long |> 
@@ -450,7 +470,7 @@ mg_readcount_long |>
   summarise(total_count = sum(readcounts)) |> 
   ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
   geom_col() +
-  ylab("Sample ID") + xlab("Total number of counts")
+  ylab("Sample ID") + xlab("Total number of counts") 
 
 ```
 
@@ -509,6 +529,9 @@ mg_relab_long |>
   scale_x_log10()
 
 ```
+
+
+
 
 ***Missing Values**
 
@@ -615,6 +638,7 @@ mg_readcount |>
 **Proportion of LBP per sample** 
 
 ```{r}
+#| fig-height: 10
 
 mg_relab_long |> 
   filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
@@ -628,6 +652,59 @@ mg_relab_long |>
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ```
+
+
+```{r}
+#| fig-height: 15
+
+mg_relab_long |> 
+  filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  group_by(taxon) |> 
+  mutate(max_rel_ab = max(relab), rel_rel_ab = relab/max_rel_ab) |>
+  ungroup() |> 
+  ggplot(aes(x = taxon, y = sampleID, fill = rel_rel_ab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+```{r}
+#| fig-height: 15
+
+mg_relab_long |> 
+  filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  group_by(taxon) |> 
+  mutate(
+    max_rel_ab = max(relab), 
+    rel_rel_ab = relab/max_rel_ab,
+    tot_rel_ab = sum(relab),
+    f_rel_ab = sum(relab != 0)/n()
+    ) |>
+  ungroup() |> 
+  arrange(f_rel_ab) |> 
+  mutate(taxon = taxon |> fct_inorder()) |> 
+  arrange(taxon) |> 
+  mutate(sampleID = sampleID |> fct_inorder()) |> 
+  ggplot(aes(x = taxon, y = sampleID, fill = (relab == 0))) +
+  geom_tile() +
+  # scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+
 
 **Proportion of all species by sample**
 
@@ -718,6 +795,27 @@ mg_relab_long |>
 
 **Total number of counts per sample by plate**
 
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(Ext_Lib_Plate ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
 ```{r}
 
 mg_readcount_long |> 
@@ -751,6 +849,28 @@ mg_readcount_long |>
       select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
     by = c("sampleID" = "UID")
   )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(BioinformaticsProcessingBatch ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
   ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
   geom_col() +
   ylab("Sample ID") + xlab("Total number of counts") + 
@@ -759,6 +879,30 @@ mg_readcount_long |>
 
 ```
 **Total number of counts per sample by lane**
+
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(Lane ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
+
 
 ```{r}
 mg_readcount_long |> 
