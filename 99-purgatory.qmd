@@ -18,6 +18,57 @@ knitr:
 editor: source
 ---
 
+```{r}
+ |> 
+  mutate(
+    arm = 
+      case_when(
+        (group4 == "Yes") ~ "LC-106-o",
+        (location == "US") ~ sample(c("Pl", "LC-106-7", "LC-115"), n(), replace = TRUE),
+        (location == "SA") ~ sample(c("Pl", "LC-106-7", "LC-106-3", "LC-115"), n(), replace = TRUE),
+        TRUE ~ "Blinded"
+      ) |> 
+      factor(levels = c("Pl", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115", "Blinded"))
+  )
+```
+
+
+##  Primary outcomes
+
+```{r}
+#simulation
+col_by_week5 <- 
+  expand_grid(
+    site = c("MGH", "CAP") |> factor(),
+    arm = c("Pl", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115") |> fct_inorder(),
+    pid = 1:10
+  ) |> 
+  slice_sample(prop = 0.9) |> 
+  mutate(
+    p = 0.0 + c(0, 0.5, 0.4, 0.7, 0.6)[arm |> as.integer()],
+    colonized_by = (rbinom(n(), 1, p) == 1)
+  )
+
+col_by_week5 <- 
+  col_by_week5 |> 
+  mutate(out = (site == "MGH") & (arm %in% c("LC-106-3", "LC-106-o")) & (pid > 4)) |>
+  filter(!out)
+
+```
+
+
+```{r}
+
+col_by_week5 <-
+  colonization |>
+  left_join(colData(mae) |> as_tibble()) |>
+  filter(visit_code == 1500)
+
+  
+
+```
+
+
 # Datadir 
 
 ## 09.04.2025

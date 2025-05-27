@@ -10,11 +10,12 @@ get_arm_colors <- function(){
   blue_hue <- 0.61
   green_hue <- 0.45
   c(
-    "gray",
-    hsv(h = blue_hue, s = 0.7, v = 0.5),
-    hsv(h = blue_hue, s = 0.55, v = 0.8),
-    hsv(h = blue_hue, s = 0.35, v = 1),
-    hsv(h = green_hue, s = 0.95, v = 0.9)
+    "Pl" = "gray",
+    "Blinded" = "gray",
+    "LC-106-7" = hsv(h = blue_hue, s = 0.7, v = 0.5),
+    "LC-106-3" = hsv(h = blue_hue, s = 0.55, v = 0.8),
+    "LC-106-o" = hsv(h = blue_hue, s = 0.35, v = 1),
+    "LC-115" = hsv(h = green_hue, s = 0.95, v = 0.9)
     )
 }
 
@@ -33,6 +34,40 @@ get_taxa_color <- function(taxa){
     ) |>
     pull(color)
 
+}
+
+
+get_taxa_colors <- function(taxa) {
+  tibble(
+    taxa = taxa
+  ) |>
+    mutate(
+      cat =
+        case_when(
+          taxa == "Other" ~ "Other",
+          str_detect(taxa, "crispatus") ~ "crispatus",
+          str_detect(taxa, "LBP") ~ "LBP",
+          str_detect(taxa, "iner") ~ "iners",
+          str_detect(taxa, "revotella") ~ "prevotella",
+          str_detect(taxa, "ardnerella") ~ "gardnerella",
+          TRUE ~ "non lacto"
+        )
+    ) |>
+    group_by(cat) |>
+    mutate(
+      color =
+        case_when(
+          taxa == "Other" ~ "gray80",
+          str_detect(taxa, "LBP") ~ colorRampPalette(c("orangered1", "red4"))(n()),
+          str_detect(taxa, "crispatus") ~ "orange",
+          str_detect(taxa, "iner") ~ "green3",
+          str_detect(taxa, "jensenii") ~ "green4",
+          str_detect(taxa, "ardnerella") ~ colorRampPalette(c("dodgerblue1", "dodgerblue4"))(n()),
+          str_detect(taxa, "revotella") ~ colorRampPalette(c("purple1", "purple4"))(n()),
+          TRUE ~ colorRampPalette(c("turquoise3", "black"))(n())
+        )
+    ) |>
+    pull(color)
 }
 
 get_site_colors <- function(){

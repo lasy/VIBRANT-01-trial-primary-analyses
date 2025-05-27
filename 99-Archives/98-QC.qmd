@@ -1,0 +1,923 @@
+---
+title: "Processing Raw Data"
+author: Laura Symul, Laura Vermeren, Susan Holmes
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+```{r}
+#| warning: false
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(patchwork)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+library(brms)
+library(gtsummary)
+library(labelled)
+library(scales)
+# library(gridExtra)
+library(ggpubr)
+# library(mia) # BiocManager::install("mia")
+
+theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+
+```
+
+```{r}
+
+#data_source <- "simulated"
+data_source <- "real"
+
+```
+
+## Metagenomics 
+
+### Importing Data 
+
+
+```{r}
+
+mg_readcount <- read_csv(str_c(data_dir(data_source), "MVIBR_kSanityVIRGO2_ReadCounts_20250404.csv"))
+mg_relab <- read_csv(str_c(data_dir(data_source), "MVIBR_kSanityVIRGO2_relAbund_20250404.csv"))
+mg_taxaGLcor <- read_csv(str_c(data_dir(data_source), "MVIBR_kSanityVIRGO2_taxaGLcor_20250404.csv"))
+mg_technical_metadata <- read_csv(str_c(data_dir(data_source), "VIBRANT_MG_technicalMetaData_20250404.csv"))
+
+```
+
+
+Strain info 
+
+```{r}
+
+# strain info 
+LBP_strain_info <- readxl::read_xlsx(str_c(dropbox_dir(), "9_VIBRANT_Study Product/IsolateNumbers.xlsx"))
+
+LBP_strain_info <- 
+ LBP_strain_info |> 
+  mutate(strain_id = `VMRC ID`, 
+         LBP = ifelse(is.na(LC106), "LC-115", "LC-106 & LC-115") |> factor(), 
+         strain_origin = `Geographic source` |> factor()
+  ) |> 
+  dplyr::rename(Biose_ID = `Biose ID`, VMRC_ID = `VMRC ID`) |> 
+  arrange(strain_origin, LBP) |> 
+  mutate(strain_id = strain_id |> fct_inorder()) |> 
+  dplyr::select(strain_id, LBP, strain_origin, contains("ID"))
+
+LBP_strain_info |>   # gt(caption = "LBP strain information")
+  set_variable_labels(
+    strain_id = "Strain ID", 
+    strain_origin = "Strain origin", 
+    Biose_ID = "Biose ID", 
+    VMRC_ID = "VMRC ID"
+  ) |> 
+  gt(caption = "LBP strain information") |> 
+  tab_style(style = cell_text(weight = "bold"),
+            locations = cells_column_labels())
+
+```
+
+The names of the strains do not correspond exactly to those in the metagenomics files. We will modify the names of the strains in *LBP_strain_info* to match them.
+
+```{r}
+
+LBP_strain_info <- 
+  LBP_strain_info |>
+  mutate(strain_id = sub("_.*", "", strain_id),
+         strain_id = case_when(strain_id == "CC0028A1" ~ "C0028A1", 
+                               TRUE ~ strain_id
+    ))
+
+LBP_strain_info |>   # gt(caption = "LBP strain information")
+  set_variable_labels(
+    strain_id = "Strain ID", 
+    strain_origin = "Strain origin", 
+    Biose_ID = "Biose ID", 
+    VMRC_ID = "VMRC ID"
+  ) |> 
+  gt(caption = "LBP strain information") |> 
+  tab_style(style = cell_text(weight = "bold"),
+            locations = cells_column_labels())
+
+
+```
+
+Check that the column names (and therefore the species/strains) are the same in all 3 files.
+
+```{r}
+
+list(mg_readcount, mg_taxaGLcor, mg_relab) %>%
+  purrr::map(~ colnames(.)) %>%
+  purrr::reduce(~ setdiff(.x, .y)) %>%
+  {if (length(.) > 0) cat("Colonnes différentes : ", ., "\n") else cat("Les noms de colonnes sont identiques.\n")}
+
+# ou 
+
+compare_columns <- function(df1, df2, df3) {
+  cols1 <- colnames(df1)
+  cols2 <- colnames(df2)
+  cols3 <- colnames(df3)
+  
+  identical_cols <- all(cols1 %in% cols2) && all(cols2 %in% cols3) && all(cols1 %in% cols3)
+  
+  if (identical_cols) {
+    return("The columns are identical in all three data frames.")
+  } else {
+    diff_cols <- list(
+      data1 = setdiff(cols1, union(cols2, cols3)),
+      data2 = setdiff(cols2, union(cols1, cols3)),
+      data3 = setdiff(cols3, union(cols1, cols2))
+    )
+    return(diff_cols)
+  }
+}
+
+result <- compare_columns(mg_readcount, mg_taxaGLcor, mg_relab)
+print(result)
+
+
+```
+
+
+## Make Sumarrize Experiment object
+
+>TODO : There's an extra column in `mg_readcount`. How do I manage this? Add an NA column?
+
+```{r}
+
+mg_to_SE <- function(mg_readcount,mg_taxaGLcor, mg_relab, mg_technical_metadata, LBP_strain_info){
+
+  for (data in list(mg_readcount, mg_taxaGLcor, mg_relab, mg_technical_metadata)) {
+    if (any(duplicated(data$sampleID))) stop("Duplicated `uid` in `mg`")
+  }
+  
+  # create assays
+  assay_readcounts <- 
+    mg_readcount |> 
+    dplyr::select(-c(CST, subCST, score)) |>
+    as.data.frame() |> 
+    column_to_rownames("sampleID") |>
+    t() 
+
+  assay_readcount_corr <- 
+    mg_taxaGLcor |> 
+    dplyr::select(-c(CST, subCST, score)) |>
+    as.data.frame() |>
+    column_to_rownames("sampleID") |>
+    t()
+  
+  assay_relative_ab <- 
+    mg_relab |> 
+    dplyr::select(-c(CST, subCST, score)) |>
+    as.data.frame() |> 
+    column_to_rownames("sampleID") |>
+    t()
+
+  se_coldata <-
+    mg_technical_metadata |>
+    rename(sampleID = UID) |>
+    as.data.frame()
+
+  se_rowdata <- 
+    mg_readcount |> 
+    dplyr::select(-c(sampleID, CST, subCST, score)) |>
+    colnames() |> 
+    as.data.frame() |> 
+    setNames("strain") |> 
+    distinct() |> 
+    left_join(
+      LBP_strain_info,
+      by = join_by(strain == strain_id)
+    ) 
+  
+  # Harmonization of the order of samples and feature
+  
+  sorted_sample_ids <- sort(as.character(se_coldata$sampleID))
+  assay_readcounts <- assay_readcounts[, sorted_sample_ids]
+  assay_readcount_corr <- assay_readcount_corr[, sorted_sample_ids]
+  assay_relative_ab <- assay_relative_ab[, sorted_sample_ids]
+  se_coldata <- se_coldata[match(sorted_sample_ids, se_coldata$sampleID), ]
+
+  sorted_strains <- assay_relative_ab |> rownames() # sort(as.character(se_rowdata$strain))
+  assay_readcounts <- assay_readcounts[sorted_strains, ]
+  assay_readcount_corr <- assay_readcount_corr[sorted_strains, ]
+  assay_relative_ab <- assay_relative_ab[sorted_strains, ]
+  se_rowdata <- se_rowdata[match(sorted_strains, se_rowdata$strain), ]
+
+  SummarizedExperiment::SummarizedExperiment(
+    assays = list(readcounts = assay_readcounts, readcount_corr = assay_readcount_corr, relative_ab = assay_relative_ab),
+    rowData = se_rowdata,
+    colData = se_coldata
+  )
+}
+
+```
+
+```{r}
+
+# SE_mg <- mg_to_SE(mg_readcount, mg_taxaGLcor, mg_relab, mg_technical_metadata, LBP_strain_info)
+
+```
+
+
+### Checks & Quality Controls
+
+#### Link between readcount relatie abundance 
+
+We test whether the relative abundance is equal to the readcount divided by the total number of reads. To do this we test :
+for the uncorrected readcount and the corrected red count if :
+
+- relative abundance (all strains/species) = readcount / total reads
+- relative abundance (LBP strains) = readcount / total reads LBP
+- relative abundance (LBP starin) = readcount / total reads LBP + crispatus
+
+
+```{r}
+
+mg_calc_relab <- 
+  mg_readcount |> 
+  mutate(
+    sum_read_LBP = rowSums(across(all_of(LBP_strain_info$strain_id))),
+    sum_read_LBPandCripsatus = rowSums(across(c(all_of(LBP_strain_info$strain_id), Lactobacillus_crispatus))),
+    sum_read_total = rowSums(across(-c(sampleID, CST, subCST, score)))
+  ) |> 
+  select(-c(CST, subCST, score)) |>
+  pivot_longer(
+    -c(sampleID, sum_read_LBP, sum_read_LBPandCripsatus, sum_read_total), 
+    names_to = "taxon", 
+    values_to = "readcount") |>
+  mutate(
+    calc.rel_ab_total = readcount / sum_read_total,
+    calc.rel_ab_LBP = readcount / sum_read_LBP,
+    calc.rel_ab_LBPandCripsatus = readcount / sum_read_LBPandCripsatus, 
+    calc.rel_ab_without_LBP = readcount / (sum_read_total - sum_read_LBP),
+    calc.rel_ab_without_LBPandCrispatus = readcount / (sum_read_total - sum_read_LBPandCripsatus)
+  ) 
+
+mg_calc_relab <-
+  mg_calc_relab |>
+  left_join(
+    mg_taxaGLcor |>
+      mutate(
+        sum_read.corr_LBP = rowSums(across(all_of(
+          LBP_strain_info$strain_id
+        ))),
+        sum_read.corr_LBPandCripsatus = rowSums(across(c(
+          all_of(LBP_strain_info$strain_id), Lactobacillus_crispatus
+        ))),
+        sum_read.corr_total = rowSums(across(-c(
+          sampleID, CST, subCST, score
+        )))
+      ) |>
+      select(-c(CST, subCST, score)) |>
+      pivot_longer(
+        -c(
+          sampleID,
+          sum_read.corr_LBP,
+          sum_read.corr_LBPandCripsatus,
+          sum_read.corr_total
+        ),
+        names_to = "taxon",
+        values_to = "readcount_corr"
+      ) |>
+      mutate(
+        calc.rel_ab_total.corr = readcount_corr / sum_read.corr_total,
+        calc.rel_ab_LBP.corr = readcount_corr / sum_read.corr_LBP,
+        calc.rel_ab_LBPandCripsatus.corr = readcount_corr / sum_read.corr_LBPandCripsatus,
+        calc.rel_ab_without_LBP.corr = readcount_corr / (sum_read.corr_total - sum_read.corr_LBP),
+        calc.rel_ab_without_LBPandCrispatus.corr = readcount_corr / (sum_read.corr_total - sum_read.corr_LBPandCripsatus)
+      ),
+    by = c("sampleID", "taxon")
+  )
+
+
+mg_calc_relab <- 
+  mg_calc_relab |> 
+  left_join(
+    mg_relab |> 
+      select(-c(CST, subCST, score)) |> 
+      pivot_longer(
+        -c(sampleID), 
+        names_to = "taxon", 
+        values_to = "rel_ab"
+      ),
+    by = c("sampleID", "taxon")
+  ) 
+
+# rel_ab = readcount / sum_read_total
+mg_calc_relab |> 
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_total)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") + 
+  labs(x = "Relative abundance", y = "Calculated relative abundance \n (read count/ total read count)", 
+       title = "Uncorrected readcount")
+
+
+# mg_calc_relab |> 
+#   ggplot(aes(x= rel_ab, y = calc.rel_ab_total, col = sampleID)) +
+#   geom_point(alpha=0.5) +
+#   geom_abline(slope = 1, intercept = 0, col = "red") + 
+#   labs(x = "Relative abundance", y = "Calculated relative abundance \n (read count/ total read count)", 
+#        title = "Uncorrected readcount") 
+
+
+mg_calc_relab |>
+  filter(taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_LBP)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance for LBP strain", y = "Calculated relative abundance \n (read count/ LBP read count)", 
+       title = "Uncorrected readcount")
+
+mg_calc_relab |>
+  filter(taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_LBPandCripsatus)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance for LBP strain", y = "Calculated relative abundance \n (read count/ LBP & crispatus read count)", title = "Uncorrected readcount")
+
+mg_calc_relab |> 
+  filter(!taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_without_LBP)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance", 
+       y = "Calculated relative abundance (species without LBP) \n (read count/ total read count (without LBP)", 
+       title = "Uncorrected readcount")
+
+mg_calc_relab |> 
+  filter(!taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_without_LBPandCrispatus)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance", 
+       y = "Calculated relative abundance (species without LBP) \n (read count/ total read count (without LBP & crisp.))", 
+       title = "Uncorrected readcount")
+
+
+mg_calc_relab |> 
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_total.corr)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") + 
+  labs(x = "Relative abundance", y = "Calculated relative abundance \n (read count/ total read count)", 
+       title = "Corrected readcount")
+
+mg_calc_relab |>
+  filter(taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_LBP.corr)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance for LBP strain", y = "Calculated relative abundance \n (read count/ LBP read count)", 
+       title = "Corrected readcount")
+
+mg_calc_relab |>
+  filter(taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_LBPandCripsatus.corr)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance for LBP strain", y = "Calculated relative abundance \n (read count/ LBP & crispatus read count)", title = "Corrected readcount")
+
+mg_calc_relab |> 
+  filter(!taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_without_LBP.corr)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance", 
+       y = "Calculated relative abundance (species without LBP) \n (read count/ total read count (without LBP)", 
+       title = "Corrected readcount")
+
+mg_calc_relab |> 
+  filter(!taxon %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x= rel_ab, y = calc.rel_ab_without_LBPandCrispatus.corr)) +
+  geom_point(alpha=0.5) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  labs(x = "Relative abundance", 
+       y = "Calculated relative abundance (species without LBP) \n (read count/ total read count (without LBP & crisp.))", 
+       title = "Corrected readcount")
+  
+
+  
+
+```
+
+**Total readcounts per sample**
+
+```{r}
+
+mg_readcount_long <- 
+  mg_readcount |> 
+  select(-c(CST, subCST, score)) |>
+  pivot_longer(-c(sampleID), names_to = "taxon", values_to = "readcounts")
+
+```
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+
+
+```{r}
+
+total_reads <- 
+ mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |> dplyr::rename(sampleID = UID) 
+  )
+
+
+total_reads |> 
+  ggplot(aes(x = total_count, fill = SampleType)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+Proportion of 0
+```{r}
+# proportion of zero 
+(mg_readcount_long$readcounts == 0)  |> mean()
+```
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
+  geom_col() +
+  ylab("Sample ID") + xlab("Total number of counts") 
+
+```
+
+
+**Total corrected readcounts per sample**
+
+```{r}
+
+mg_readcount.corr_long <- 
+  mg_taxaGLcor |> 
+  select(-c(CST, subCST, score)) |>
+  pivot_longer(-c(sampleID), names_to = "taxon", values_to = "readcounts")
+
+```
+
+
+```{r}
+
+mg_readcount.corr_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+
+Proportion of 0
+
+```{r}
+
+(mg_taxaGLcor_long$readcounts_corr == 0)  |> mean()
+
+```
+
+
+**Total proportion per sample**
+
+```{r}
+
+mg_relab_long <- 
+  mg_relab |> 
+  select(-c(CST, subCST, score)) |>
+  pivot_longer(-c(sampleID), names_to = "taxon", values_to = "relab")
+
+```
+
+
+```{r}
+
+mg_relab_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(relab)) |> 
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+
+
+
+
+***Missing Values**
+
+```{r}
+
+mg_readcount_long |>
+  ggplot(aes(x=taxon, y = sampleID, fill = is.na(readcounts))) + 
+  geom_tile() + 
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  labs(title = "Missing values in readcount") +
+  scale_fill_manual(
+    values = c("TRUE" = "pink", "FALSE" = "steelblue2"),  
+    labels = c("FALSE" = "Présent", "TRUE" = "Manquant")) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+mg_readcount.corr_long |>
+  ggplot(aes(x=taxon, y = sampleID, fill = is.na(readcounts_corr))) + 
+  geom_tile() + 
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  labs(title = "Missing values in corrected readcount") +
+  scale_fill_manual(
+    values = c("TRUE" = "pink", "FALSE" = "steelblue2"),  
+    labels = c("FALSE" = "Présent", "TRUE" = "Manquant")) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+mg_relab_long |>
+  ggplot(aes(x=taxon, y = sampleID, fill = is.na(relab))) + 
+  geom_tile() + 
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  labs(title = "Missing values in relative abundance") +
+  scale_fill_manual(
+    values = c("TRUE" = "pink", "FALSE" = "steelblue2"),  
+    labels = c("FALSE" = "Présent", "TRUE" = "Manquant")) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+```
+**Outliers**
+
+```{r}
+
+one_third <- floor((ncol(mg_readcount) - 4)/3)
+two_third <- floor((ncol(mg_readcount) - 4)/3*2)
+three_third <- ncol(mg_readcount) - 4
+
+one_quarter <- floor((ncol(mg_readcount) - 4)/4)
+two_quarter <- floor((ncol(mg_readcount) - 4)/4*2)
+three_quarter <- floor((ncol(mg_readcount) - 4)/4*3)
+fourth_quarter <- ncol(mg_readcount) - 4
+
+
+mg_readcount |> 
+  select(-c(CST, subCST, score)) |>
+  select(1, 2:one_quarter) |> 
+  pivot_longer(-sampleID, names_to = "taxon", values_to = "readcounts") |>
+  ggplot(aes(x = taxon, y = readcounts)) + 
+  geom_boxplot() + 
+  scale_x_discrete("Strains") +
+  scale_y_log10() +
+  labs(title = "Outliers in readcount - Partie 1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+mg_readcount |> 
+  select(-c(CST, subCST, score)) |>
+  select(1, one_quarter:two_quarter) |> 
+  pivot_longer(-sampleID, names_to = "taxon", values_to = "readcounts") |>
+  ggplot(aes(x = taxon, y = readcounts)) + 
+  geom_boxplot() + 
+  scale_x_discrete("Strains") +
+  scale_y_log10() +
+  labs(title = "Outliers in readcount - Partie 1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+mg_readcount |> 
+  select(-c(CST, subCST, score)) |>
+  select(1, two_quarter:three_quarter) |> 
+  pivot_longer(-sampleID, names_to = "taxon", values_to = "readcounts") |>
+  ggplot(aes(x = taxon, y = readcounts)) + 
+  geom_boxplot() + 
+  scale_x_discrete("Strains") +
+  scale_y_log10() +
+  labs(title = "Outliers in readcount - Partie 1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+mg_readcount |> 
+  select(-c(CST, subCST, score)) |>
+  select(1, three_quarter:fourth_quarter) |> 
+  pivot_longer(-sampleID, names_to = "taxon", values_to = "readcounts") |>
+  ggplot(aes(x = taxon, y = readcounts)) + 
+  geom_boxplot() + 
+  scale_x_discrete("Strains") +
+  scale_y_log10() +
+  labs(title = "Outliers in readcount - Partie 1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+
+
+**Proportion of LBP per sample** 
+
+```{r}
+#| fig-height: 10
+
+mg_relab_long |> 
+  filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  ggplot(aes(x = taxon, y = sampleID, fill = relab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+```{r}
+#| fig-height: 15
+
+mg_relab_long |> 
+  filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  group_by(taxon) |> 
+  mutate(max_rel_ab = max(relab), rel_rel_ab = relab/max_rel_ab) |>
+  ungroup() |> 
+  ggplot(aes(x = taxon, y = sampleID, fill = rel_rel_ab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+```{r}
+#| fig-height: 15
+
+mg_relab_long |> 
+  filter(taxon %in% all_of(LBP_strain_info$strain_id)) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  group_by(taxon) |> 
+  mutate(
+    max_rel_ab = max(relab), 
+    rel_rel_ab = relab/max_rel_ab,
+    tot_rel_ab = sum(relab),
+    f_rel_ab = sum(relab != 0)/n()
+    ) |>
+  ungroup() |> 
+  arrange(f_rel_ab) |> 
+  mutate(taxon = taxon |> fct_inorder()) |> 
+  arrange(taxon) |> 
+  mutate(sampleID = sampleID |> fct_inorder()) |> 
+  ggplot(aes(x = taxon, y = sampleID, fill = (relab == 0))) +
+  geom_tile() +
+  # scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+
+
+**Proportion of all species by sample**
+
+```{r}
+
+mg_relab_long |> 
+  filter(!taxon %in% LBP_strain_info$strain_id) |> 
+  left_join(LBP_strain_info, by = c("taxon" = "strain_id")) |>
+  ggplot(aes(x = taxon, y = sampleID, fill = relab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Species (without LBP") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free_x", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+#### check by technical data
+
+
+```{r}
+
+mg_relab_long <- 
+  mg_relab |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  ) |> 
+  pivot_longer(
+    -c(sampleID, CST, subCST, score, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch), 
+    names_to = "strain_id", 
+    values_to = "rel_ab"
+  )
+
+```
+
+**Relative abundance of LBP strain by plate**
+
+```{r}
+
+mg_relab_long |> 
+  filter(strain_id %in% LBP_strain_info$strain_id) |>
+  ggplot(aes(x = strain_id, y = sampleID, fill = rel_ab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_wrap(~Ext_Lib_Plate, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+**Relative abundance of LBP strain by batch**
+
+```{r}
+
+mg_relab_long |> 
+  filter(strain_id %in% LBP_strain_info$strain_id) |> 
+  ggplot(aes(x = strain_id, y = sampleID, fill = rel_ab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_wrap(~ BioinformaticsProcessingBatch, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+**Relative abundance of LBP strain by lane**
+
+```{r}
+
+mg_relab_long |> 
+  filter(strain_id %in% LBP_strain_info$strain_id) |> 
+  ggplot(aes(x = strain_id, y = sampleID, fill = rel_ab)) +
+  geom_tile() +
+  scale_fill_continuous(low = "white", high = "steelblue2") +
+  scale_x_discrete("Strains") +
+  scale_y_discrete("Samples",breaks = NULL) +
+  facet_wrap(~ Lane, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+**Total number of counts per sample by plate**
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(Ext_Lib_Plate ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
+  geom_col() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_wrap(~ Ext_Lib_Plate, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+**Total number of counts per sample by batch**
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(BioinformaticsProcessingBatch ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
+  geom_col() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_wrap(~ BioinformaticsProcessingBatch, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+**Total number of counts per sample by lane**
+
+
+
+```{r}
+
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count)) +
+  geom_histogram() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_grid(Lane ~ ., scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_log10()
+
+```
+
+
+
+```{r}
+mg_readcount_long |> 
+  group_by(sampleID) |> 
+  summarise(total_count = sum(readcounts)) |> 
+  left_join(
+    mg_technical_metadata |>
+      filter(is.na(LibrarySequencedTwice)) |> 
+      select(UID, Ext_Lib_Plate, Ext_Lib_Position, Lane, FragmentSize, BioinformaticsProcessingBatch),
+    by = c("sampleID" = "UID")
+  )  |>  
+  ggplot(aes(x = total_count, y = sampleID |> fct_rev())) +
+  geom_col() +
+  ylab("Sample ID") + xlab("Total number of counts") + 
+  facet_wrap(~ Lane, scales = "free_y", strip.position = "top") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+

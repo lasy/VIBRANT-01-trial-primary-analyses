@@ -1,0 +1,108 @@
+---
+title: "Checks and Quality controls"
+author: Laura Symul
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+
+### Visualization of available data for each assay and each `site x arm x participant x visit`
+
+```{r}
+
+available_data <- 
+  mae[["visit_attendance"]] |> 
+  as_tibble() |> 
+  filter(.feature == "attended") |> 
+  dplyr::rename(attended = visit_attendance) |> 
+  left_join(
+    mae@sampleMap |> 
+      as_tibble() |> 
+      filter(assay != "visit_attendance") |> 
+      mutate(.sample = primary) |> 
+      dplyr::select(.sample, assay),
+    by = join_by(.sample)
+  ) |> 
+  left_join(
+    mae@colData |> as_tibble() |> dplyr::select(.sample, pid, site, arm, starts_with("visit_"))
+  ) |> 
+  mutate(available_data = ifelse(attended == FALSE, FALSE, TRUE))
+
+assay_collection_schedule <- 
+  available_data |> 
+  filter(!is.na(assay)) |> 
+  group_by(assay, visit_code) |> 
+  summarize(assay_scheduled_at_visit = !all(is.na(available_data)), .groups = "drop") |> 
+  filter(assay_scheduled_at_visit)
+
+available_data <- 
+  available_data |> 
+  left_join(
+    assay_collection_schedule,
+    by = join_by(assay, visit_code)
+  )
+
+available_data <- 
+  available_data |> 
+  filter(assay_scheduled_at_visit) 
+
+available_data
+
+
+```
+
+```{r}
+#| fig-height: 10
+#| fig-width: 7
+
+available_data |> 
+  filter(attended == TRUE) |>  # ou available_data == TRUE
+  ggplot(aes(x = assay, y = pid, col = assay)) +
+  geom_point() +
+  facet_grid(arm + site ~ visit_code, scales = "free", space = "free") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), legend.position  = "none") 
+
+```
+
+### Checking for contamination
+
+While it is possible for a few Placebo participants to natively have strains that are extremely similar to the LBP strains, it is highly unlikely for many of the LBP strains to be present simultaneously in a single sample for a placebo participant. Such event would much more likely be the result of contamination OR a mislabeling of the sample OR a randomization issue. 
+
+We thus check how many LBP strains are simultaneously present in the Placebo participants samples 
+
+> TODO
+
+```{r}
+
+mae[["mg_ksanity"]] |> 
+  left_join(
+    colData(mae) |> 
+      as.tibble() |> 
+      dplyr::select(.sample, site, arm, visit_code, pid), 
+    by = ".sample"
+  ) |> 
+  filter(arm == "Pl" & !is.na(LBP)) |> 
+  ggplot(aes(x = pid, y = unique_kmers, color = strain)) + 
+  geom_point() + 
+  facet_grid(visit_code ~ strain, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
+
+
+### Other checks ?
+
+

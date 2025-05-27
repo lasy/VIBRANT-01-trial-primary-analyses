@@ -1,0 +1,309 @@
+---
+title: "Demographics table"
+author: Laura Symul & Laura Vermeren
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+### Summary table 
+
+We created the variable *food_insecurity* based on the variables *cut_size_meals*, *eat_less*, and *hungry_did_not_eat* (questions 16, 17, and 18 from CRF 12). The variable *food_insecurity* is set to *yes* if the response to at least one of these three questions is *yes*.
+
+```{r}
+
+participants <- 
+  participants |> 
+  mutate(
+    food_insecurity = ifelse(
+      cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
+      "Yes",
+      "No"
+    ),
+    food_insecurity = factor(food_insecurity, levels = c("No", "Yes"))
+  )
+
+participants |> 
+  ggplot(aes(x = food_insecurity)) +
+  geom_bar() +
+  labs(x= "Food insecurity", y = "Count")+
+  theme_classic()
+
+```
+
+
+We create two summary table : one by arms and one by sites.
+
+```{r}
+
+participants_bis <- 
+  participants |>
+  select(-c(eat_less, cut_size_meals, hungry_did_not_eat)) |>
+  mutate(
+    across(where(is.character), as.factor),
+    arm = fct_recode(
+      arm,
+      Placebo = "Pl",
+      `LC106 7 days` = "LC-106-7",
+      `LC106 3 days` = "LC-106-3",
+      `LC106 overlap` = "LC-106-o",
+      `LC115 7 days` = "LC-115"
+    ), 
+    site = fct_recode(
+      site, 
+      MGH = "MGH", 
+      VCRS = "CAP"
+    )
+  ) |>
+  set_variable_labels(
+    food_insecurity = "Report food insecurity in past 12 months ",
+    gender_sexual_partners = "Gender of sexual partners",
+    sexual_partners_past_month = "Number of partners in past month",
+    sexual_partners_lifetime = "Number of partners in lifetime", 
+    dropout_time = "Dropout time",
+    eth = "Ethnicity"
+  ) |>
+  rename_with(~ str_to_title(.x)) 
+
+```
+
+
+```{r}
+
+participants_bis |>
+  select(-c("Pid", "Dropout_time"))  |>
+  mutate(
+    Arm = fct_recode(
+      Arm,
+      Placebo = "Placebo",
+      `LC106 <br> 7 days` = "LC106 7 days",
+      `LC106 <br> 3 days` = "LC106 3 days",
+      `LC106 <br> overlap` = "LC106 overlap",
+      `LC115 <br> 7 days` = "LC115 7 days"
+    )) |> 
+  tbl_summary(
+    by = Arm,
+    type =
+      list(
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({min}-{max})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  )  |>
+  modify_spanning_header(all_stat_cols() ~ "**Treatment Received**") |>
+  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
+    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
+    tibble::tibble(p.value = result$p.value)},
+    include = -c("Site")
+    ) |> 
+  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
+
+# add_p(test = all_categorical() ~ "chisq.test")
+
+
+```
+
+```{r}
+
+participants_bis |> 
+  select(-c("Pid", "Dropout_time")) |> 
+  tbl_summary(
+    by = Site,
+    type =
+      list(
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  )  |>
+  modify_spanning_header(all_stat_cols() ~ "**Sites**") |>
+  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
+    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
+    tibble::tibble(p.value = result$p.value)}
+    ) |> 
+  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
+
+```
+
+### Graphics 
+
+```{r}
+
+
+ggplot(participants_bis, aes(x = Age, fill = Site, col = Site)) +
+  geom_histogram(alpha = 0.5, position = "identity") +
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2) +
+    theme_classic() 
+  
+participants_bis$Gender_sexual_partners
+  
+    
+ggplot(participants_bis, aes(x = Gender_sexual_partners, fill = Site)) +
+    geom_bar(position = "dodge") +
+    theme_classic() +
+    scale_fill_manual(values = custom_colors) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_x_discrete(labels = wrap_format(10)) +
+    labs(x = str_wrap(var_label, width = 17), y="") 
+
+```
+
+
+```{r}
+
+cat_vars <- 
+  participants_bis |>
+  select(where(is.factor) | where(is.character), -Pid) |>
+  names()
+
+num_vars <- 
+  participants_bis |>
+  select(where(is.numeric) | where(is.integer)) |>
+  names()
+
+plots <- list()
+
+custom_colors <- c("VCRS" = "green4", "MGH" = "steelblue1")
+
+for (var in cat_vars) {
+  var_label <- var_label(participants_bis[[var]])
+  var_label <- ifelse(!is.null(var_label), var_label, var)
+  
+  p <- 
+    ggplot(participants_bis, aes_string(x = var, fill = "Site")) +
+    geom_bar(position = "dodge") +
+    theme_classic() +
+    scale_fill_manual(values = custom_colors) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_x_discrete(labels = wrap_format(10)) +
+    labs(x = str_wrap(var_label, width = 17), y="") 
+  
+  #plots[[var]] <- p
+  print(p)
+}
+
+for (var in num_vars) {
+  var_label <- var_label(participants_bis[[var]])
+  var_label <- ifelse(!is.null(var_label), var_label, var)
+  
+  p <- 
+    ggplot(participants_bis, aes_string(x = var, fill = "Site", col = "Site")) +
+    geom_histogram(alpha = 0.5, position = "identity") +
+    # geom_density(lwd = 1.2,
+    #            linetype = 2,
+    #            colour = 2) +
+    theme_classic() +
+    scale_fill_manual(values = custom_colors) +  
+    scale_color_manual(values = custom_colors) +  
+    theme(plot.title = element_text(hjust = 0.5)) +
+    labs(y = str_wrap(var_label, width = 17))  
+  
+  #plots[[var]] <- p
+  print(p)
+}
+
+
+# ggarrange(plotlist = plots, ncol = 2, nrow = ceiling(length(plots)/2))
+
+```
+```{r}
+
+p1 <- participants_bis |> 
+  ggplot(aes(x=Race))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="") +
+  facet_grid(Site~Arm) 
+
+p2 <- participants_bis |> 
+  ggplot(aes(x=Food_insecurity))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="", x = var_label(participants_bis$Food_insecurity)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
+  facet_grid(Site~Arm)
+
+p3 <- participants_bis |> 
+  ggplot(aes(x=Contraception))+ 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="") +
+  facet_grid(Site~Arm)
+
+p4 <- participants_bis |> 
+  ggplot(aes(x=Gender_sexual_partners))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="", x = var_label(participants_bis$Gender_sexual_partners)) +
+  facet_grid(Site~Arm)
+
+p5 <- participants_bis |> 
+  ggplot(aes(x=Sexual_partners_past_month))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="", x = var_label(participants_bis$Sexual_partners_past_month)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
+  facet_grid(Site~Arm)
+
+p6 <- participants_bis |> 
+  ggplot(aes(x=Sexual_partners_lifetime))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="", x = var_label(participants_bis$Sexual_partners_lifetime)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
+  facet_grid(Site~Arm)
+
+p7 <- participants_bis |> 
+  ggplot(aes(x=Dropout))+ 
+  geom_bar() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  labs(y="") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+
+  facet_grid(Site~Arm) + 
+  theme(
+  axis.text.x = element_text(angle = 90, hjust = 1),
+  plot.margin = margin(t = 5, r = 5, b = 30, l = 5)  # bas = 30 points
+)
+
+#ggarrange(p1, p2, p4, p5, p6, p7, p3, ncol=4, nrow=2) 
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+
+```
+
+
+
+

@@ -1,0 +1,289 @@
+---
+title: "Secondary outcomes"
+author: Laura Symul, Laura Vermeren, Susan Holmes
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+### Kinetics of colonization
+
+#### Total proportions of LBP isolates
+
+```{r}
+
+total_rel_ab_of_LBP <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(!is.na(LBP)) |> 
+  group_by(.sample, uid) |>
+  summarize(
+    total_LBP_rel_ab = sum(rel_abs_bact, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+total_rel_ab_of_LBP <- 
+  total_rel_ab_of_LBP |> 
+  dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid))
+  
+```
+
+
+```{r}
+
+g_tot_prop_LBP_strains <- 
+  total_rel_ab_of_LBP |>
+  filter(visit_type == "Clinic", !is.na(arm)) |> 
+  ggplot(aes(x = study_week, y = total_LBP_rel_ab, col = arm)) +
+  geom_line(aes(group = pid), alpha = 0.5) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  facet_grid(site ~ arm) + 
+  scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
+  scale_y_continuous(
+    "Total proportion of LBP strains", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  expand_limits(y = 0) +
+  scale_color_manual(values = get_arm_colors()) +
+  guides(col = "none") +
+  ggtitle(make_title(mae)) 
+
+```
+
+```{r}
+
+g_tot_prop_LBP_strains
+
+```
+
+
+#### Proportions of participants who colonized
+
+
+```{r}
+
+g_prop_colonized_by <- 
+  total_rel_ab_of_LBP |> 
+  filter(!is.na(arm)) |> 
+  group_by(site, arm, study_week) |>
+  summarize(
+    prop_who_colonized_at = mean(total_LBP_rel_ab > 0.05), 
+    CI_low = 
+      prop.test(
+        x = sum(total_LBP_rel_ab > 0.05), n = n(), 
+        conf.level = 0.95)$conf.int[1],
+    CI_high = 
+      prop.test(
+        x = sum(total_LBP_rel_ab > 0.05), n = n(), 
+        conf.level = 0.95)$conf.int[2],
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
+  geom_ribbon(
+    aes(ymin = CI_low, ymax = CI_high, fill = arm), 
+    alpha = 0.2, color = NA
+  ) +
+  geom_line() +
+  geom_point() +
+  facet_grid(site ~ .) + 
+  scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
+  scale_y_continuous(
+    "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  expand_limits(y = 0) +
+  scale_color_manual("Arm", values = get_arm_colors()) +
+  scale_fill_manual("Arm", values = get_arm_colors()) +
+  ggtitle(make_title(mae)) 
+
+g_prop_colonized_by
+
+```
+
+
+
+
+#### Figure 2
+
+```{r}
+#| fig-width: 15
+#| fig-height: 6
+
+ g_prop_colonized_by + 
+  g_tot_prop_LBP_strains +
+  plot_layout(guides = "collect", widths = c(1, 2)) +
+  plot_annotation(tag_level = "a") &
+  theme(legend.position = "bottom")
+
+```
+
+### Microbiota trajectories
+
+
+
+
+```{r}
+
+rel_abs <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  select(
+    .feature, .sample, uid, rel_abs_bact, 
+    taxon_label, genus, LBP, strain_origin
+    ) 
+
+```
+
+```{r}
+rel_abs <- 
+  rel_abs |> 
+  group_by(.feature) |> 
+  mutate(max_rel_ab = max(rel_abs_bact, na.rm = TRUE)) |> 
+  ungroup() |> 
+  arrange(is.na(LBP), -max_rel_ab) |> 
+  mutate(.feature = .feature |> fct_inorder()) |> 
+  mutate(
+    taxon = 
+      case_when(
+        as.numeric(.feature) <= 29 ~ taxon_label,
+        TRUE ~ "Other"
+      )
+  ) |> 
+  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -max_rel_ab) |> 
+  mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other", after = Inf))
+```
+
+```{r}
+rel_abs_agg <- 
+  rel_abs |> 
+  group_by(uid, taxon, LBP, strain_origin) |> 
+  summarize(rel_ab = sum(rel_abs_bact), .groups = "drop") |> 
+  dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
+```
+
+
+
+```{r}
+
+g_trajectories <-
+  rel_abs_agg |>
+  mutate(study_week = case_when(visit_code == "0000" ~ -1, TRUE ~ study_week)) |>
+  filter(randomized != 0, visit_type == "Clinic", !is.na(study_week)) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(-tot_LC115, -tot_LBP) |> 
+  mutate(pid = pid |> fct_inorder()) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) +
+  geom_col() +
+  facet_grid(study_week ~ site + arm, scales = "free", space = "free") +
+  # theme(panel.spacing.x = unit(0, "points")) +
+  scale_fill_manual(
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  scale_y_continuous(
+    "relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants") +
+  theme(
+    strip.text.y = element_text(angle = 0, hjust = 0),
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+  )
+
+```
+
+```{r}
+#| fig-height: 8
+#| fig-width: 14
+#| eval: true
+
+g_trajectories
+
+```
+
+
+
+### Individual LBP strains by sites
+
+```{r}
+
+LBP_strains <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(!is.na(LBP)) |> 
+  select(.feature, .sample, uid, rel_abs_bact, LBP, strain_origin) |> 
+  left_join(mae |> colData() |> as_tibble())
+  
+```
+
+```{r}
+
+LBP_strains |> 
+  filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  ggplot() +
+  aes(x = .feature, y = rel_abs_bact, col = site) +
+  geom_point(alpha = 0.5, size = 0.5) +
+  # geom_boxplot(outlier.size = 0.5) +
+  facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  xlab("LBP strain") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+  ) 
+
+
+LBP_strains |> 
+  filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  ggplot() +
+  aes(x = .feature, y = rel_abs_bact, col = site) +
+  # geom_point(alpha = 0.5, size = 0.5) +
+  geom_boxplot(outlier.size = 0.5) +
+  facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  xlab("LBP strain") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+  ) 
+  
+```
+
+
+```{r}
+#| fig-width: 15
+#| fig-height: 5
+
+LBP_strains |> 
+  filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  ggplot() +
+  aes(x = study_week |> factor(), y = rel_abs_bact, col = strain_origin) +
+  geom_point(alpha = 0.5, size = 0.5) +
+  geom_line(aes(group = pid), alpha = 0.5) +
+  facet_grid(site ~ LBP + strain_origin + .feature , scales = "free_x", space = "free_x") +
+  xlab("Study week") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+  ) 
+
+```
+
+
+
+
+
+
+

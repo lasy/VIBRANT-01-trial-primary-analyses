@@ -24,8 +24,8 @@ ttservice
 tidySummarizedExperiment
 Rcpp
 brms
-phyloseq
 gtsummary
 labelled
 scales
 ggpubr
+MultiAssayExperiment
