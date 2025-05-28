@@ -18,14 +18,55 @@ knitr:
 editor: source
 ---
 
-### Summary table 
+```{r}
+#| warning: false
 
-We created the variable *food_insecurity* based on the variables *cut_size_meals*, *eat_less*, and *hungry_did_not_eat* (questions 16, 17, and 18 from CRF 12). The variable *food_insecurity* is set to *yes* if the response to at least one of these three questions is *yes*.
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(gtsummary)
+library(patchwork)
+library(labelled)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+library(MultiAssayExperiment)
+
+tmp <- fs::dir_map("R/", source)
+
+theme_set(theme_light())
+```
+
+
+# Loading the `MultiAssayExperiment` object
 
 ```{r}
 
-participants <- 
-  participants |> 
+data_source <- "real"
+mae_files <- 
+  fs::dir_ls(data_dir(data_source = data_source), regexp = "mae_full_.*\\.rds$") |> 
+  sort(decreasing = TRUE) |>
+  magrittr::extract(1)
+
+mae <- readRDS(mae_files)
+
+rm(mae_files)
+
+```
+
+
+### Summary table 
+
+We create a `table1_data` table from the metadata of the `participant_crfs_merged` mae, which contains only the variables needed to create table 1 (`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method` and `group4`) and the participants including in the mITT population. 
+
+We create the variable `food_insecurity` based on the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`. If any of these three variables is "Yes", then the participant is considered to be food insecure.
+
+```{r}
+
+table1_data <- 
+  metadata(mae)$participant_crfs_merged |> 
+  left_join(colData(mae) |> as_tibble() |> select(pid, ITT, mITT, PP) |> distinct(), by = "pid") |> 
+  filter(mITT) |> 
+  select(pid, site, age, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method, group4) |> 
   mutate(
     food_insecurity = ifelse(
       cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
@@ -33,9 +74,11 @@ participants <-
       "No"
     ),
     food_insecurity = factor(food_insecurity, levels = c("No", "Yes"))
-  )
+  ) |> 
+  select(-c(eat_less, cut_size_meals, hungry_did_not_eat))
 
-participants |> 
+
+table1_data |> 
   ggplot(aes(x = food_insecurity)) +
   geom_bar() +
   labs(x= "Food insecurity", y = "Count")+
@@ -43,56 +86,101 @@ participants |>
 
 ```
 
-
-We create two summary table : one by arms and one by sites.
+We also need to include the partner's gender. This information is requested at visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120 in crf19. The variable `past_week_sex_partner` of `visits` table will be summarize in 3 categories:
+- Only male 
+- Only female
+- Both
+And add to the `table1_data` table.
 
 ```{r}
 
-participants_bis <- 
-  participants |>
-  select(-c(eat_less, cut_size_meals, hungry_did_not_eat)) |>
-  mutate(
-    across(where(is.character), as.factor),
-    arm = fct_recode(
-      arm,
-      Placebo = "Pl",
-      `LC106 7 days` = "LC-106-7",
-      `LC106 3 days` = "LC-106-3",
-      `LC106 overlap` = "LC-106-o",
-      `LC115 7 days` = "LC-115"
-    ), 
-    site = fct_recode(
-      site, 
-      MGH = "MGH", 
-      VCRS = "CAP"
-    )
-  ) |>
-  set_variable_labels(
-    food_insecurity = "Report food insecurity in past 12 months ",
-    gender_sexual_partners = "Gender of sexual partners",
-    sexual_partners_past_month = "Number of partners in past month",
-    sexual_partners_lifetime = "Number of partners in lifetime", 
-    dropout_time = "Dropout time",
-    eth = "Ethnicity"
-  ) |>
-  rename_with(~ str_to_title(.x)) 
+gender_sexual_partner <- 
+  metadata(mae)$visits_crfs_merged |>
+  select(pid, past_week_sex_partner) |>
+  filter(!is.na(past_week_sex_partner)) |>
+  group_by(pid) |>
+  summarise(
+    gender_sexual_partner = case_when(
+      all(past_week_sex_partner == "No sex in the past week") ~ "No sex",
+      any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
+        !any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Only man",
+      any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) &
+        !any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) ~ "Only female",
+      any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
+        any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Both",
+      TRUE ~ NA_character_
+    ),
+    .groups = "drop"
+  )
+
+table1_data <- 
+  table1_data |> 
+  left_join(gender_sexual_partner, by = "pid")
 
 ```
 
 
+For the time being, participants are randomly assigned to a treatment arm, except for those in group4, who are assigned to the *LC-106-o* arm.
+
+We recode the `race` variable:
+- "Asian or South Asian" is recoded to "Asian"
+- "Black, African American, or African" and "African" are recoded to "Black"
+- "Coloured", "White" and "Other" are not changed
+- "Prefered not to answer" is dropped since no participants are in this category
+
 ```{r}
 
-participants_bis |>
-  select(-c("Pid", "Dropout_time"))  |>
+table1_data <-
+  table1_data |>
+  
+  # randomly assign participants to arms
   mutate(
-    Arm = fct_recode(
-      Arm,
-      Placebo = "Placebo",
-      `LC106 <br> 7 days` = "LC106 7 days",
-      `LC106 <br> 3 days` = "LC106 3 days",
-      `LC106 <br> overlap` = "LC106 overlap",
-      `LC115 <br> 7 days` = "LC115 7 days"
-    )) |> 
+    arm = case_when(
+      group4 == "Yes" ~ "LC-106-o",
+      TRUE ~ sample(
+        c("Palcebo", "LC-106-7", "LC-106-3", "LC-115"),
+        size = n(),
+        replace = TRUE
+      )
+    ),
+    across(where(is.character), as.factor),
+    
+    race = fct_recode(
+      race,
+      "Asian" = "Asian or South Asian",
+      "Black" = "Black, African American, or African",
+      "Black" = "African",
+      "Coloured" = "Coloured",
+      "White" = "White",
+      "Other" = "Other"
+    ),
+    
+    race = fct_drop(race, only = "Prefer not to answer"),
+    race = fct_relevel(race, "Asian", "Black", "Coloured", "White", "Other"), 
+    arm = fct_relevel(arm, "Palcebo", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115"),
+  ) |>
+  
+  select(-group4) |>
+  
+  set_variable_labels(
+    food_insecurity = "Report food insecurity in past 12 months ",
+    #gender_sexual_partners = "Gender of sexual partners",
+    sexual_partners_past_month = "Number of partners in past month",
+    sexual_partners_lifetime = "Number of partners in lifetime",
+    ethn = "Ethnicity", 
+    contraception_method = "Contraception", 
+    gender_sexual_partner = "Gender of sexual partners"
+  )
+
+```
+
+Create Table 1 (by arm)
+
+```{r}
+
+table1_data |> 
+  select(-pid) |>
+  rename_with(~ str_to_title(.x)) |>  
   tbl_summary(
     by = Arm,
     type =
@@ -104,24 +192,19 @@ participants_bis |>
       all_continuous() ~ "{mean} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
-  )  |>
-  modify_spanning_header(all_stat_cols() ~ "**Treatment Received**") |>
-  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
-    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
-    tibble::tibble(p.value = result$p.value)},
-    include = -c("Site")
-    ) |> 
-  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
-
-# add_p(test = all_categorical() ~ "chisq.test")
-
+  )  |> 
+  add_p()
 
 ```
 
+
+Create Table 1 (by site)
+
 ```{r}
 
-participants_bis |> 
-  select(-c("Pid", "Dropout_time")) |> 
+table1_data |> 
+  select(arm, age, race, site, food_insecurity, contraception_method, sexual_partners_past_month, sexual_partners_lifetime) |>
+  rename_with(~ str_to_title(.x)) |>  
   tbl_summary(
     by = Site,
     type =
@@ -130,18 +213,59 @@ participants_bis |>
         Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({sd})",
+      all_continuous() ~ "{mean} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
-  )  |>
-  modify_spanning_header(all_stat_cols() ~ "**Sites**") |>
-  add_p(test = all_categorical() ~ function(data, variable, by, ...) {
-    result <- fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
-    tibble::tibble(p.value = result$p.value)}
-    ) |> 
-  modify_footnote(p.value ~ "P-values from Kruskal-Wallis rank sum test and Fisher's exact test (simulated if needed).")
+  )  |> 
+  add_p()
+
 
 ```
+
+And filanlly we create one Table 1 for each site 
+
+```{r}
+
+
+table1_data |> 
+  filter(site == "CAP") |> 
+  select(-c(pid, site)) |>
+  rename_with(~ str_to_title(.x)) |>  
+  tbl_summary(
+    by = Arm,
+    type =
+      list(
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({min}-{max})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |> 
+  add_p()
+
+table1_data |> 
+  filter(site == "MGH") |> 
+  select(-c(pid, site)) |>
+  rename_with(~ str_to_title(.x)) |>  
+  tbl_summary(
+    by = Arm,
+    type =
+      list(
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({min}-{max})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |> 
+  add_p()
+
+
+```
+
 
 ### Graphics 
 
@@ -228,6 +352,8 @@ for (var in num_vars) {
 # ggarrange(plotlist = plots, ncol = 2, nrow = ceiling(length(plots)/2))
 
 ```
+
+
 ```{r}
 
 p1 <- participants_bis |> 
