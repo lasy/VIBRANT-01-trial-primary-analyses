@@ -47,11 +47,14 @@ tmp <- fs::dir_map("R", source)
 
 ```
 
- # Introduction
 
-This document presents the primary analyses of the VIBRANT trial.
 
-Currently, this runs on blinded data.
+This document presents the primary analyses of the VIBRANT trial. Currently, this runs on blinded data, and population flags have not yet been fully accounted for.
+
+
+:::callout-warning
+Population flags still need to be included in the analysis
+:::
 
 ## Loading the data
 

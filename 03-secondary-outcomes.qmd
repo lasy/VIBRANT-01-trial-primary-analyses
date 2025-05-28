@@ -18,6 +18,10 @@ knitr:
 editor: source
 ---
 
+
+
+
+
 ### Kinetics of colonization
 
 #### Total proportions of LBP isolates
@@ -191,7 +195,7 @@ g_trajectories <-
   mutate(pid = pid |> fct_inorder()) |> 
   ggplot(aes(y = rel_ab, x = pid, fill = taxon)) +
   geom_col() +
-  facet_grid(study_week ~ site + arm, scales = "free", space = "free") +
+  facet_grid(study_week ~ arm + site, scales = "free", space = "free") +
   # theme(panel.spacing.x = unit(0, "points")) +
   scale_fill_manual(
     values = get_taxa_colors(rel_abs_agg$taxon |> levels()),

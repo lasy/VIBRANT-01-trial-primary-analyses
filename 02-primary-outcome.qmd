@@ -29,11 +29,11 @@ col_by_week5 <-
   as_tibble() |> 
   dplyr::left_join(
     mae@colData |> as_tibble() |> 
-      select(uid, pid, visit_code, site, location, randomized, arm) |> 
+      select(uid, pid, visit_code, site, location, randomized, arm, ITT, mITT, PP) |> 
       mutate(.sample = uid),
     by = join_by(.sample)
   ) |> 
-  filter(randomized, visit_code == "1500", .feature == "colonized_by") |> 
+  filter(randomized, mITT, visit_code == "1500", .feature == "colonized_by") |> 
   mutate(LBP_colonization_by_week5 = outcome) 
 
 ```
