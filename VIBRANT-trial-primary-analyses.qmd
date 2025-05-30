@@ -62,8 +62,19 @@ Population flags still need to be included in the analysis
 
 ```{r}
 
-mae <- readRDS("/Users/laurasymul/OneDrive - UCL/Academia/Research/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250527.rds")
-mae
+# mae <- readRDS("/Users/laurasymul/OneDrive - UCL/Academia/Research/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250527.rds")
+# mae <- readRDS("/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250529.rds")
+# mae
+
+data_source <- "real"
+mae_files <- 
+  fs::dir_ls(data_dir(data_source = data_source), regexp = "mae_full_.*\\.rds$") |> 
+  sort(decreasing = TRUE) |>
+  magrittr::extract(1)
+
+mae <- readRDS(mae_files)
+
+rm(mae_files)
 
 ```
 
@@ -73,7 +84,6 @@ mae
 ## Demographics (Table 1)
 
 ```{r child = '01-Demographics.qmd'}
-#| eval: false
 ```
 
 ## Primary outcomes (Table 2)

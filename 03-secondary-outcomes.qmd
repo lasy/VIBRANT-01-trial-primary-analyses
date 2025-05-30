@@ -247,6 +247,11 @@ LBP_strains |>
   # geom_boxplot(outlier.size = 0.5) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   xlab("LBP strain") +
+  scale_y_continuous(
+    "Relative abundance bacteria", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  scale_color_manual(values = get_site_colors()) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
@@ -260,6 +265,11 @@ LBP_strains |>
   geom_boxplot(outlier.size = 0.5) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   xlab("LBP strain") +
+  scale_y_continuous(
+    "Relative abundance bacteria", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  scale_color_manual(values = get_site_colors()) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
@@ -274,11 +284,18 @@ LBP_strains |>
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = study_week |> factor(), y = rel_abs_bact, col = strain_origin) +
+  aes(x = study_week, y = rel_abs_bact, col = strain_origin) +
   geom_point(alpha = 0.5, size = 0.5) +
   geom_line(aes(group = pid), alpha = 0.5) +
   facet_grid(site ~ LBP + strain_origin + .feature , scales = "free_x", space = "free_x") +
   xlab("Study week") +
+  scale_y_continuous(
+    "Relative abundance bacteria", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  #scale_color_manual(values = colorspace::darken(scale_colour_hue()$palette(2), amount = 0.4)) +
+  scale_color_manual(values = get_origin_colors()) +
+  scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
