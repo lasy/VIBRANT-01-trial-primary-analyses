@@ -208,7 +208,8 @@ table1_data |>
       all_categorical() ~ "{n} ({p}%)"
     )
   ) |> 
-  add_p()
+  add_p()|>
+  modify_caption("**Site = CAP**")
 
 table1_data |> 
   filter(site == "MGH") |> 
@@ -226,7 +227,8 @@ table1_data |>
       all_categorical() ~ "{n} ({p}%)"
     )
   ) |> 
-  add_p()
+  add_p()|>
+  modify_caption("**Site = MGH**")
 
 
 ```

@@ -50,6 +50,8 @@ col_by_week5_qPCR <-
   filter(randomized, mITT, visit_code == "1500", .feature == "detected_by_qpcr") |> 
   mutate(LBP_colonization_by_week5 = outcome) #outcom
 
+# crispatus dominance 
+
 crisp_dom_by_5week <- 
   mae[["col_crispatus_mg"]] |> 
   as_tibble() |> 
@@ -124,12 +126,12 @@ col_by_week5_qPCR |>
 #| fig-width: 10
 #| fig-height: 2
 
-col_by_week5_qPCR |> 
-  arrange(site, arm, LBP_colonization_by_week5) |>
+crisp_dom_by_5week |> 
+  arrange(site, arm, crisp_dom_by_5week) |>
   group_by(site, arm) |> 
   mutate(participant_number = row_number() |> factor()) |> 
   ungroup() |> 
-  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = LBP_colonization_by_week5)) +
+  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = crisp_dom_by_5week)) +
   geom_point(size = 3) +
   facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
   guides(color = "none", fill = "none") +

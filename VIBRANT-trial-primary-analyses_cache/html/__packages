@@ -20,7 +20,6 @@ GenomeInfoDb
 GenomicRanges
 Biobase
 SummarizedExperiment
-ttservice
 tidySummarizedExperiment
 Rcpp
 brms

@@ -43,7 +43,7 @@ tmp <- fs::dir_map("R", source)
 
 ```{r}
 
-#data_source <- "real"
+data_source <- "real"
 
 ```
 
@@ -66,7 +66,6 @@ Population flags still need to be included in the analysis
 # mae <- readRDS("/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250529.rds")
 # mae
 
-data_source <- "real"
 mae_files <- 
   fs::dir_ls(data_dir(data_source = data_source), regexp = "mae_full_.*\\.rds$") |> 
   sort(decreasing = TRUE) |>

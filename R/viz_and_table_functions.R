@@ -74,6 +74,9 @@ get_site_colors <- function(){
   c("CAP" = "green4", "MGH" = "steelblue1")
 }
 
+get_origin_colors <- function(){
+  c("SA" = "green3", "US" = "steelblue3", "Other" = "gray80")
+}
 
 arrange_participants <- function(tb, by){
   tb |>
