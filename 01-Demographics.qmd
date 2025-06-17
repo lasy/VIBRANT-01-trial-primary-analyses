@@ -29,9 +29,9 @@ We create the variable `food_insecurity` based on the three variables `cut_size_
 
 table1_data <- 
   metadata(mae)$participant_crfs_merged |> 
-  dplyr::left_join(colData(mae) |> as_tibble() |> select(pid, site, ITT, mITT, PP) |> distinct(), by = "pid") |> 
+  dplyr::left_join(colData(mae) |> as_tibble() |> select(pid, site, ITT, mITT, PP) |> distinct()) |> 
   filter(mITT) |> 
-  select(pid, site, age_at_consent, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method, group4) |> 
+  select(pid, site, age, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method, group4) |> 
   mutate(
     food_insecurity = ifelse(
       cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
@@ -43,32 +43,6 @@ table1_data <-
   select(-c(eat_less, cut_size_meals, hungry_did_not_eat))
 
 ```
-```{r}
-#| eval: false
-
-table1_data <- 
-  colData(mae) |> as_tibble() |> select(pid, site, ITT, mITT, PP) |> distinct() |> 
-  left_join(
-    bind_rows(
-    mae@metadata$crf_data_clean$crf1 |> select(pid, age, race, ethn) |> distinct(),
-    mae@metadata$crf_data_clean$crf101 |> select(pid,  age, race) |> distinct()
-    ),
-    by = join_by(pid)
-  ) |> 
-  filter(mITT) |> 
-  select(pid, site, age_at_consent, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method, group4) |> 
-  mutate(
-    food_insecurity = ifelse(
-      cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
-      "Yes",
-      "No"
-    ),
-    food_insecurity = factor(food_insecurity, levels = c("No", "Yes"))
-  ) |> 
-  select(-c(eat_less, cut_size_meals, hungry_did_not_eat))
-
-```
-
 
 
 ```{r}
@@ -219,7 +193,7 @@ table1_data |>
 
 ```
 
-And filanlly we create one Table 1 for each site 
+And finally we create one Table 1 for each site 
 
 ```{r}
 
