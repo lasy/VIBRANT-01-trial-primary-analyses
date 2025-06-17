@@ -38,12 +38,8 @@ library(ggpubr)
 
 theme_set(theme_light())
 tmp <- fs::dir_map("R", source)
-
-```
-
-```{r}
-
-data_source <- "real"
+tmp <- fs::dir_map("../VIBRANT-99-utils/R/", source)
+rm(tmp)
 
 ```
 
@@ -58,16 +54,11 @@ Population flags still need to be included in the analysis
 
 ## Loading the data
 
-> TODO: change path
 
 ```{r}
 
-# mae <- readRDS("/Users/laurasymul/OneDrive - UCL/Academia/Research/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250527.rds")
-# mae <- readRDS("/Users/lvermeren/OneDrive - UCL/VIBRANT data UCLouvain/actual data/03 QCed MAEs/mae_full_20250529.rds")
-# mae
-
 mae_files <- 
-  fs::dir_ls(data_dir(data_source = data_source), regexp = "mae_full_.*\\.rds$") |> 
+  fs::dir_ls(str_c(data_dir(), "03 QCed MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
   sort(decreasing = TRUE) |>
   magrittr::extract(1)
 
