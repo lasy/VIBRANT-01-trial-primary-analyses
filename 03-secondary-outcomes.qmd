@@ -191,9 +191,9 @@ g_trajectories <-
     tot_LBP = sum(rel_ab[!is.na(LBP)])
     ) |> 
   ungroup() |> 
-  arrange(-tot_LC115, -tot_LBP) |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
   mutate(pid = pid |> fct_inorder()) |> 
-  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) +
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon, alpha = ifelse(PP, "PP", "mITT"))) +
   geom_col() +
   facet_grid(study_week ~ arm + site, scales = "free", space = "free") +
   # theme(panel.spacing.x = unit(0, "points")) +
@@ -201,6 +201,7 @@ g_trajectories <-
     values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
     guide = guide_legend(ncol = 1)
     ) +
+  scale_alpha_discrete("Population", range = c(0.5, 1)) +
   scale_y_continuous(
     "relative abundance", labels = scales::percent,
     breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
@@ -214,7 +215,7 @@ g_trajectories <-
 ```
 
 ```{r}
-#| fig-height: 8
+#| fig-height: 9
 #| fig-width: 14
 #| eval: true
 
