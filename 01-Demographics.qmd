@@ -21,17 +21,24 @@ editor: source
 
 ### Summary table 
 
-We create a `table1_data` table from the metadata of the `participant_crfs_merged` mae, which contains only the variables needed to create table 1 (`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method` and `group4`) and the participants including in the mITT population. 
+We create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae`. 
 
-We create the variable `food_insecurity` based on the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`. If any of these three variables is "Yes", then the participant is considered to be food insecure.
+This table contains almost all variables needed to create table 1 (*i.e., *`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method`).
+
+In addition, the `mae@colData` contains the participants' `arm` and study population flags (here we keep the `mITT` population). 
+
+From the variables listed above, we create the variable `food_insecurity` using the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`: if any of these three variables is "Yes", then the participant is considered to be affected by food insecurity.
 
 ```{r}
 
 table1_data <- 
   metadata(mae)$participant_crfs_merged |> 
-  dplyr::left_join(colData(mae) |> as_tibble() |> select(pid, site, ITT, mITT, PP) |> distinct()) |> 
+  dplyr::left_join(
+    colData(mae) |> as_tibble() |> select(pid, site, arm, ITT, mITT, PP) |> distinct(), 
+    by = join_by(pid, site)
+    ) |> 
   filter(mITT) |> 
-  select(pid, site, age, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method, group4) |> 
+  select(pid, site, arm, age, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method) |> 
   mutate(
     food_insecurity = ifelse(
       cut_size_meals == "Yes" | eat_less == "Yes" | hungry_did_not_eat == "Yes",
@@ -46,6 +53,7 @@ table1_data <-
 
 
 ```{r}
+#| eval: false
 
 table1_data |> 
   ggplot(aes(x = food_insecurity)) +
@@ -57,11 +65,18 @@ table1_data |>
 ```
 
 
-We also need to include the partner's gender. This information is requested at visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120 in crf19. The variable `past_week_sex_partner` of `visits` table will be summarize in 3 categories:
+We also need to include the participants' partner's gender. 
+
+Participants are asked about their partner's gender at visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120 in CRF 19. 
+
+The variable `past_week_sex_partner` of the `mae@metadata$visits_crfs_merged` table will be summarize into one of these 4 categories:
+
+- No sex
 - Only male 
 - Only female
 - Both
-And add to the `table1_data` table.
+
+We add this variable to the `table1_data` table.
 
 ```{r}
 
@@ -71,16 +86,17 @@ gender_sexual_partner <-
   filter(!is.na(past_week_sex_partner)) |>
   group_by(pid) |>
   summarise(
-    gender_sexual_partner = case_when(
-      all(past_week_sex_partner == "No sex in the past week") ~ "No sex",
-      any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
-        !any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Only man",
-      any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) &
-        !any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) ~ "Only female",
-      any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
-        any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Both",
-      TRUE ~ NA_character_
-    ),
+    gender_sexual_partner = 
+      case_when(
+        all(past_week_sex_partner == "No sex in the past week") ~ "No sex",
+        any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
+          !any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Only man",
+        any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) &
+          !any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) ~ "Only female",
+        any(past_week_sex_partner %in% c("A single male partner", "Multiple male partners")) &
+          any(past_week_sex_partner %in% c("A single female partner", "Multiple female partners")) ~ "Both",
+        TRUE ~ NA_character_
+      ),
     .groups = "drop"
   )
 
@@ -91,29 +107,20 @@ table1_data <-
 ```
 
 
-For the time being, participants are randomly assigned to a treatment arm, except for those in group4, who are assigned to the *LC-106-o* arm.
 
-We recode the `race` variable:
-- "Asian or South Asian" is recoded to "Asian"
-- "Black, African American, or African" and "African" are recoded to "Black"
-- "Coloured", "White" and "Other" are not changed
-- "Prefered not to answer" is dropped since no participants are in this category
+We also re-code the `race` variable as follows:
+
+- "Asian or South Asian" is re-coded to "Asian" (for brievity)
+- "Black, African American, or African" and "African" are re-coded to "Black" (for brievity)
+- "Coloured", "White", "Other", and "Prefered not to answer" are left as is.
+
 
 ```{r}
 
 table1_data <-
   table1_data |>
   
-  # randomly assign participants to arms
   mutate(
-    arm = case_when(
-      group4 == "Yes" ~ "LC-106-o",
-      TRUE ~ sample(
-        c("Palcebo", "LC-106-7", "LC-106-3", "LC-115"),
-        size = n(),
-        replace = TRUE
-      )
-    ),
     across(where(is.character), as.factor),
     
     race = fct_recode(
@@ -123,19 +130,16 @@ table1_data <-
       "Black" = "African",
       "Coloured" = "Coloured",
       "White" = "White",
-      "Other" = "Other"
+      "Other" = "Other",
+      "Prefer not to answer" = "Prefer not to answer"
     ),
     
-    race = fct_drop(race, only = "Prefer not to answer"),
-    race = fct_relevel(race, "Asian", "Black", "Coloured", "White", "Other"), 
-    arm = fct_relevel(arm, "Palcebo", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115"),
+    race = fct_relevel(race, "Asian", "Black", "Coloured", "White", "Other", "Prefer not to answer"),
+    arm = arm |> fct_drop()
   ) |>
-  
-  select(-group4) |>
   
   set_variable_labels(
     food_insecurity = "Report food insecurity in past 12 months ",
-    #gender_sexual_partners = "Gender of sexual partners",
     sexual_partners_past_month = "Number of partners in past month",
     sexual_partners_lifetime = "Number of partners in lifetime",
     ethn = "Ethnicity", 
@@ -164,7 +168,7 @@ table1_data |>
       all_categorical() ~ "{n} ({p}%)"
     )
   )  |> 
-  add_p()
+  add_p(include = -Site)
 
 ```
 

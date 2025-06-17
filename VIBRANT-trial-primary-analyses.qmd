@@ -10,7 +10,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: refresh # true refresh false
+  cache: true # true refresh false
   warning: false
 knitr:
   opts_chunk:
@@ -45,7 +45,7 @@ rm(tmp)
 
 
 
-This document presents the primary analyses of the VIBRANT trial. Currently, this runs on blinded data, and population flags have not yet been fully accounted for.
+This document presents the primary analyses of the VIBRANT trial. 
 
 
 ## Loading the data
@@ -54,7 +54,7 @@ This document presents the primary analyses of the VIBRANT trial. Currently, thi
 ```{r}
 
 mae_files <- 
-  fs::dir_ls(str_c(data_dir(), "03 QCed MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
+  fs::dir_ls(str_c(data_dir(), "04 unblinded MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
   sort(decreasing = TRUE) |>
   magrittr::extract(1)
 

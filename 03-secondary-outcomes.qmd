@@ -97,7 +97,7 @@ g_prop_colonized_by <-
   ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
   geom_ribbon(
     aes(ymin = CI_low, ymax = CI_high, fill = arm), 
-    alpha = 0.2, color = NA
+    alpha = 0.1, color = NA
   ) +
   geom_line() +
   geom_point() +
@@ -125,8 +125,8 @@ g_prop_colonized_by
 #| fig-width: 15
 #| fig-height: 6
 
- g_prop_colonized_by + 
-  g_tot_prop_LBP_strains +
+ (g_prop_colonized_by + ggtitle("")) +
+  (g_tot_prop_LBP_strains + ggtitle("")) +
   plot_layout(guides = "collect", widths = c(1, 2)) +
   plot_annotation(tag_level = "a") &
   theme(legend.position = "bottom")
@@ -135,16 +135,13 @@ g_prop_colonized_by
 
 ### Microbiota trajectories
 
-
-
-
 ```{r}
 
 rel_abs <- 
   mae[["mg"]] |> 
   as_tibble() |> 
   select(
-    .feature, .sample, uid, rel_ab, 
+    .feature, .sample, uid, rel_ab, poor_quality_mg_data,
     taxon_label, genus, LBP, strain_origin
     ) 
 
@@ -154,9 +151,9 @@ rel_abs <-
 rel_abs <- 
   rel_abs |> 
   group_by(.feature) |> 
-  mutate(max_rel_ab = max(rel_ab, na.rm = TRUE)) |> 
+  mutate(max_rel_ab = max(rel_ab, na.rm = TRUE), mean_rel_ab = mean(rel_ab, na.rm = TRUE)) |> 
   ungroup() |> 
-  arrange(is.na(LBP), -max_rel_ab) |> 
+  arrange(is.na(LBP), -mean_rel_ab) |> 
   mutate(.feature = .feature |> fct_inorder()) |> 
   mutate(
     taxon = 
@@ -165,14 +162,14 @@ rel_abs <-
         TRUE ~ "Other"
       )
   ) |> 
-  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -max_rel_ab) |> 
+  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
   mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other", after = Inf))
 ```
 
 ```{r}
 rel_abs_agg <- 
   rel_abs |> 
-  group_by(uid, taxon, LBP, strain_origin) |> 
+  group_by(uid, taxon, LBP, strain_origin, poor_quality_mg_data) |> 
   summarize(rel_ab = sum(rel_ab), .groups = "drop") |> 
   dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
 ```
@@ -184,7 +181,7 @@ rel_abs_agg <-
 g_trajectories <-
   rel_abs_agg |>
   mutate(study_week = case_when(visit_code == "0000" ~ -1, TRUE ~ study_week)) |>
-  filter(mITT, randomized != 0, visit_type == "Clinic", !is.na(study_week)) |>
+  filter(mITT, randomized != 0, visit_type == "Clinic", !is.na(study_week), !poor_quality_mg_data) |>
   group_by(pid) |> 
   mutate(
     tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
@@ -209,6 +206,7 @@ g_trajectories <-
   scale_x_discrete("Participants") +
   theme(
     strip.text.y = element_text(angle = 0, hjust = 0),
+    strip.text.x = element_text(angle = 90, hjust = 0),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   )
 
@@ -288,7 +286,7 @@ LBP_strains |>
   aes(x = study_week, y = rel_ab, col = strain_origin) +
   geom_point(alpha = 0.5, size = 0.5) +
   geom_line(aes(group = pid), alpha = 0.5) +
-  facet_grid(site ~ LBP + strain_origin + .feature , scales = "free_x", space = "free_x") +
+  facet_grid(site ~ LBP |> str_replace("&", "&\n") + strain_origin + .feature , scales = "free_x", space = "free_x") +
   xlab("Study week") +
   scale_y_continuous(
     "Relative abundance bacteria", labels = scales::percent,
