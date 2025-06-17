@@ -25,44 +25,58 @@ editor: source
 ```{r}
 
 col_by_week5 <- 
-  mae[["col_LBP_mg"]] |> 
-  as_tibble() |> 
-  dplyr::left_join(
-    mae@colData |> as_tibble() |> 
-      select(uid, pid, visit_code, site, location, randomized, arm, ITT, mITT, PP) |> 
-      mutate(.sample = uid),
-    by = join_by(.sample)
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
   ) |> 
-  filter(randomized, mITT, visit_code == "1500", .feature == "colonized_LBP_by_mg") |> 
-  mutate(LBP_colonization_by_week5 = outcome) 
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
+  
 
 # by qPCR 
 
-col_by_week5_qPCR <- 
-  mae[["col_LBP_qPCR"]] |> 
-  as_tibble() |> 
-  dplyr::left_join(
-    mae@colData |> as_tibble() |> 
-      select(uid, pid, visit_code, site, location, randomized, arm, ITT, mITT, PP) |> 
-      mutate(.sample = uid),
-    by = join_by(.sample)
+col_by_week5_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "detected_by_qpcr")
   ) |> 
-  filter(randomized, mITT, visit_code == "1500", .feature == "detected_by_qpcr") |> 
-  mutate(LBP_colonization_by_week5 = outcome) #outcom
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
+
 
 # crispatus dominance 
 
 crisp_dom_by_5week <- 
-  mae[["col_crispatus_mg"]] |> 
-  as_tibble() |> 
-  dplyr::left_join(
-    mae@colData |> as_tibble() |> 
-      select(uid, pid, visit_code, site, location, randomized, arm, ITT, mITT, PP) |> 
-      mutate(.sample = uid),
-    by = join_by(.sample)
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_crispatus_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "crispatus_dominance_by_mg")
   ) |> 
-  filter(randomized, mITT, visit_code == "1500", .feature == "crispatus_dominance_by_mg") |> 
-  mutate(crisp_dom_by_5week = outcome)
+  mutate(crisp_dom_by_5week = outcome |> replace_na(FALSE)) 
   
 
 ```
@@ -85,7 +99,7 @@ col_by_week5 |>
   facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
   guides(color = "none", fill = "none") +
   scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = get_site_colors()) + 
+  scale_color_manual(values = site_colors) + 
   xlab("Participant number") + ylab("") +
   theme(
     legend.position = "top",
@@ -111,7 +125,7 @@ col_by_week5_qPCR |>
   facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
   guides(color = "none", fill = "none") +
   scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = get_site_colors()) + 
+  scale_color_manual(values = site_colors) + 
   xlab("Participant number") + ylab("") +
   ggtitle("DATA STILL BLINDED - qPCR") +
   theme(
@@ -136,7 +150,7 @@ crisp_dom_by_5week |>
   facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
   guides(color = "none", fill = "none") +
   scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = get_site_colors()) + 
+  scale_color_manual(values = site_colors) + 
   xlab("Participant number") + ylab("") +
   ggtitle("DATA STILL BLINDED - crispatus dominance") +
   theme(
@@ -220,7 +234,41 @@ table_2 |>
 ```
 
 
-#### Tests / models
+#### Tests 
+
+
+```{r}
+#| eval: false
+
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
+
+map(
+  arms_to_test,
+  ~ {
+    arm_to_test <- .x
+    tmp <- col_by_week5 |> filter(arm %in% c("Pl", arm_to_test))
+    table_for_test <- table(tmp$LBP_colonization_by_week5, tmp$arm |> fct_drop())
+    test_res <- fisher.test(table_for_test, alternative = "greater")
+    tibble(
+      arm = arm_to_test,
+      p_value = test_res$p.value,
+      OR = test_res$estimate,
+      lower_CI = test_res$conf.int[1],
+      upper_CI = test_res$conf.int[2]
+    )
+  }
+) |> 
+  bind_rows() |> 
+  mutate(
+    adj_p_value = p_value |> p.adjust(method = "BH")
+  )
+  
+```
+
+
+
+
+#### Model
 
 
 ```{r}
@@ -238,6 +286,9 @@ bfit <-
     )
 
 ```
+
+
+
 ```{r}
 #| eval: false
 summary(bfit)
@@ -251,10 +302,10 @@ bind_cols(col_by_week5_agg, predict(bfit))
 #| fig-width: 10
 #| fig-height: 4
 
-plot_res <- plot(conditional_effects(bfit), ask = FALSE) 
+plot_res <- plot(conditional_effects(bfit), ask = FALSE)
 
 plot_res <- lapply(plot_res, function(p) {
-  p + scale_color_manual(values = get_site_colors())
+  p + scale_color_manual(values = site_colors)
 })
 
 Reduce(`+`, plot_res) + 
@@ -373,22 +424,13 @@ table_2_with_model_results |>
 ```{r}
 
 col_by_week5 <- 
-  mae[["col_LBP_mg"]] |> #primary_outcome
-  as_tibble() |> 
-  dplyr::left_join(
-    mae@colData |> as_tibble() |> 
-      select(uid, pid, visit_code, site, location, randomized, arm) |> 
-      mutate(.sample = uid),
-    by = join_by(.sample)
-  ) |> 
-  filter(randomized, visit_code == "1500", .feature == "colonized_LBP_by_mg") |> 
-  mutate(LBP_colonization_by_week5 = outcome) |> 
+  col_by_week5 |> 
   mutate(
     arm = 
       case_when(
         (arm == "LC-106-o") ~ arm,
-        (location == "US") ~ sample(c("Pl", "LC-106-7", "LC-115"), n(), replace = TRUE),
-        (location == "SA") ~ sample(c("Pl", "LC-106-7", "LC-106-3", "LC-115"), n(), replace = TRUE),
+        (site == "MGH") ~ sample(c("Pl", "LC-106-7", "LC-115"), n(), replace = TRUE),
+        (site == "CAP") ~ sample(c("Pl", "LC-106-7", "LC-106-3", "LC-115"), n(), replace = TRUE),
         TRUE ~ "Blinded"
       ) |> 
       factor(levels = c("Pl", "LC-106-7", "LC-106-3", "LC-106-o", "LC-115", "Blinded"))
@@ -414,7 +456,7 @@ col_by_week5 |>
   facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
   guides(color = "none", fill = "none") +
   scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = get_site_colors()) +
+  scale_color_manual(values = site_colors) +
   xlab("Participant number") + ylab("") +
   theme(
     legend.position = "top",
@@ -496,7 +538,107 @@ table_2 |>
 ```
 
 
-#### Tests / models
+#### Tests 
+
+```{r}
+
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
+
+fisher_test_results <- 
+  map(
+    arms_to_test,
+    ~ {
+      arm_to_test <- .x
+      tmp <- col_by_week5 |> filter(arm %in% c("Pl", arm_to_test))
+      table_for_test <- table(tmp$LBP_colonization_by_week5, tmp$arm |> fct_drop())
+      test_res <- fisher.test(table_for_test, alternative = "greater")
+      tibble(
+        arm = arm_to_test,
+        p_value = test_res$p.value,
+        OR = test_res$estimate,
+        lower_CI = test_res$conf.int[1],
+        upper_CI = test_res$conf.int[2]
+      )
+    }
+  ) |> 
+  bind_rows() |> 
+  mutate(
+    adj_p_value = p_value |> p.adjust(method = "BH")
+  )
+
+```
+
+
+
+```{r}
+
+test_results <- 
+  fisher_test_results |> 
+  mutate(
+    adj_p_value = adj_p_value |> round(3) |> as.character(),
+    OR = OR |> round(2) |> as.character(),
+    CI = str_c(lower_CI |> round(2), " - ", upper_CI |> round(2))
+    ) |> 
+  select(arm, adj_p_value, OR, CI) |>
+  pivot_longer(cols = -arm, names_to = "name", values_to = "value") |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  mutate(
+    name = 
+      case_when(
+        name == "adj_p_value" ~ "Adj. p-value",
+        name == "OR" ~ "OR",
+        name == "CI" ~ "95% CI",
+        TRUE ~ name
+      )
+  )
+  
+```
+
+```{r}
+
+table_2_with_model_results <- 
+  bind_rows(
+    table_2,
+    test_results
+  ) |> 
+  mutate(
+    site = site |> str_replace_na(""),
+    Pl = 
+      case_when(
+        name == "Adj. p-value" ~ "Ref.",
+        name == "OR" ~ "",
+        str_detect(name, "CI") ~ "",
+        TRUE ~ Pl
+      )
+  )
+
+```
+
+
+```{r}
+
+table_2_with_model_results |> 
+  group_by(site) |>
+  gt(caption = "Table 2: Colonization by week 5 by arm and site", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(150),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+  
+```
+
+
+
+#### Model
 
 
 ```{r}
@@ -514,6 +656,9 @@ bfit <-
     )
 
 ```
+
+
+
 ```{r}
 #| eval: false
 summary(bfit)
@@ -529,7 +674,7 @@ bind_cols(col_by_week5_agg, predict(bfit))
 
 plot_res <- plot(conditional_effects(bfit), ask = FALSE) 
 plot_res <- lapply(plot_res, function(p) {
-  p + scale_color_manual(values = get_site_colors())
+  p + scale_color_manual(values = site_colors)
 })
 
 Reduce(`+`, plot_res) +

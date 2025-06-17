@@ -24,7 +24,7 @@ editor: source
 
 ### Kinetics of colonization
 
-#### Total proportions of LBP isolates
+#### Total relative abundances of LBP isolates
 
 ```{r}
 
@@ -34,7 +34,7 @@ total_rel_ab_of_LBP <-
   filter(!is.na(LBP)) |> 
   group_by(.sample, uid) |>
   summarize(
-    total_LBP_rel_ab = sum(rel_abs_bact, na.rm = TRUE),
+    total_LBP_rel_ab = sum(rel_ab, na.rm = TRUE),
     .groups = "drop"
   )
 
@@ -56,7 +56,7 @@ g_tot_prop_LBP_strains <-
   facet_grid(site ~ arm) + 
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   scale_y_continuous(
-    "Total proportion of LBP strains", labels = scales::percent,
+    "Total relative abundances\nof LBP strains", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
   expand_limits(y = 0) +
@@ -144,7 +144,7 @@ rel_abs <-
   mae[["mg"]] |> 
   as_tibble() |> 
   select(
-    .feature, .sample, uid, rel_abs_bact, 
+    .feature, .sample, uid, rel_ab, 
     taxon_label, genus, LBP, strain_origin
     ) 
 
@@ -154,7 +154,7 @@ rel_abs <-
 rel_abs <- 
   rel_abs |> 
   group_by(.feature) |> 
-  mutate(max_rel_ab = max(rel_abs_bact, na.rm = TRUE)) |> 
+  mutate(max_rel_ab = max(rel_ab, na.rm = TRUE)) |> 
   ungroup() |> 
   arrange(is.na(LBP), -max_rel_ab) |> 
   mutate(.feature = .feature |> fct_inorder()) |> 
@@ -173,7 +173,7 @@ rel_abs <-
 rel_abs_agg <- 
   rel_abs |> 
   group_by(uid, taxon, LBP, strain_origin) |> 
-  summarize(rel_ab = sum(rel_abs_bact), .groups = "drop") |> 
+  summarize(rel_ab = sum(rel_ab), .groups = "drop") |> 
   dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
 ```
 
@@ -184,7 +184,7 @@ rel_abs_agg <-
 g_trajectories <-
   rel_abs_agg |>
   mutate(study_week = case_when(visit_code == "0000" ~ -1, TRUE ~ study_week)) |>
-  filter(randomized != 0, visit_type == "Clinic", !is.na(study_week)) |>
+  filter(mITT, randomized != 0, visit_type == "Clinic", !is.na(study_week)) |>
   group_by(pid) |> 
   mutate(
     tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
@@ -232,7 +232,7 @@ LBP_strains <-
   mae[["mg"]] |> 
   as_tibble() |> 
   filter(!is.na(LBP)) |> 
-  select(.feature, .sample, uid, rel_abs_bact, LBP, strain_origin) |> 
+  select(.feature, .sample, uid, rel_ab, LBP, strain_origin) |> 
   left_join(mae |> colData() |> as_tibble())
   
 ```
@@ -242,7 +242,7 @@ LBP_strains <-
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = .feature, y = rel_abs_bact, col = site) +
+  aes(x = .feature, y = rel_ab, col = site) +
   geom_point(alpha = 0.5, size = 0.5) +
   # geom_boxplot(outlier.size = 0.5) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
@@ -251,7 +251,7 @@ LBP_strains |>
     "Relative abundance bacteria", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
-  scale_color_manual(values = get_site_colors()) +
+  scale_color_manual(values = site_colors) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
@@ -260,7 +260,7 @@ LBP_strains |>
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = .feature, y = rel_abs_bact, col = site) +
+  aes(x = .feature, y = rel_ab, col = site) +
   # geom_point(alpha = 0.5, size = 0.5) +
   geom_boxplot(outlier.size = 0.5) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
@@ -269,7 +269,7 @@ LBP_strains |>
     "Relative abundance bacteria", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
-  scale_color_manual(values = get_site_colors()) +
+  scale_color_manual(values = site_colors) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
@@ -284,7 +284,7 @@ LBP_strains |>
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = study_week, y = rel_abs_bact, col = strain_origin) +
+  aes(x = study_week, y = rel_ab, col = strain_origin) +
   geom_point(alpha = 0.5, size = 0.5) +
   geom_line(aes(group = pid), alpha = 0.5) +
   facet_grid(site ~ LBP + strain_origin + .feature , scales = "free_x", space = "free_x") +
@@ -294,7 +294,7 @@ LBP_strains |>
     breaks = seq(0, 1, by = 0.2)
   ) +
   #scale_color_manual(values = colorspace::darken(scale_colour_hue()$palette(2), amount = 0.4)) +
-  scale_color_manual(values = get_origin_colors()) +
+  scale_color_manual("Strain origin", values = strain_origin_colors) +
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
