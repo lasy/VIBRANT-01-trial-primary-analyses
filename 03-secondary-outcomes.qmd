@@ -31,7 +31,12 @@ editor: source
 total_rel_ab_of_LBP <- 
   mae[["mg"]] |> 
   as_tibble() |> 
-  filter(!is.na(LBP)) |> 
+  filter(!is.na(LBP), !poor_quality_mg_data) |> 
+  left_join(
+    mae |> colData() |> as_tibble(), 
+    by = join_by(uid)
+  ) |>
+  filter(randomized, mITT) |> 
   group_by(.sample, uid) |>
   summarize(
     total_LBP_rel_ab = sum(rel_ab, na.rm = TRUE),
@@ -231,8 +236,9 @@ LBP_strains <-
   mae[["mg"]] |> 
   as_tibble() |> 
   filter(!is.na(LBP)) |> 
-  select(.feature, .sample, uid, rel_ab, LBP, strain_origin) |> 
-  left_join(mae |> colData() |> as_tibble())
+  select(.feature, .sample, uid, rel_ab, LBP, strain_origin, poor_quality_mg_data) |> 
+  left_join(mae |> colData() |> as_tibble()) |> 
+  filter(mITT, !poor_quality_mg_data, randomized)
   
 ```
 
@@ -293,7 +299,7 @@ LBP_strains |>
     breaks = seq(0, 1, by = 0.2)
   ) +
   #scale_color_manual(values = colorspace::darken(scale_colour_hue()$palette(2), amount = 0.4)) +
-  scale_color_manual("Strain origin", values = strain_origin_colors) +
+  scale_color_manual("Strain origin", values = get_origin_colors()) +
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)

@@ -19,7 +19,6 @@ editor: source
 ---
 
 
-
 ### Colonization by week 5
 
 ```{r}

@@ -36,7 +36,7 @@ table1_data <-
   dplyr::left_join(
     colData(mae) |> as_tibble() |> select(pid, site, arm, ITT, mITT, PP) |> distinct(), 
     by = join_by(pid, site)
-    ) |> 
+    )  |> 
   filter(mITT) |> 
   select(pid, site, arm, age, race, ethn, cut_size_meals, eat_less, hungry_did_not_eat, sexual_partners_lifetime, sexual_partners_past_month, contraception_method) |> 
   mutate(
