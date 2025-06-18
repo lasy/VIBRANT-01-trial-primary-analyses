@@ -226,6 +226,37 @@ g_trajectories
 
 ```
 
+```{r}
+#| eval: false
+# checking the data for the placebo participant that has the LBP strains at MGH
+
+mae[["mg"]] |> 
+  as_tibble() |> 
+  dplyr::left_join(mae@colData |> as_tibble()) |> 
+  filter(pid == "068100062", study_week == 5) 
+
+
+mae[["qPCR"]] |> 
+  as_tibble() |> 
+  dplyr::left_join(mae@colData |> as_tibble()) |> 
+  filter(pid == "068100062", study_week == 5) 
+
+mae[["amplicon"]] |> 
+  as_tibble() |> 
+  dplyr::left_join(mae@colData |> as_tibble()) |> 
+  filter(pid == "068100062", study_week == 5) |> 
+  select(.feature, .sample, rel_ab, exclude_sample)
+
+
+mae[["amplicon"]] |> 
+  as_tibble() |> 
+  dplyr::left_join(mae@colData |> as_tibble()) |> 
+  filter(pid == "068100062", .feature == "Lactobacillus_crispatus") |> 
+  select(.feature, .sample, visit_code, rel_ab, exclude_sample)
+
+```
+
+
 
 
 ### Individual LBP strains by sites
