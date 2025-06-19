@@ -18,6 +18,40 @@ knitr:
 editor: source
 ---
 
+
+
+
+```{r}
+#| eval: false
+
+mae@colData |> 
+  as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  write_csv("VIBRANT-trial-participants.csv", na = "")
+
+mae[["qPCR"]] |> 
+  as_tibble() |> 
+  write_csv("VIBRANT-qPCR.csv", na = "")
+
+
+mae[["mg"]] |> 
+  as_tibble() |> 
+  select(
+    .feature, .sample,
+    count, count_corr, rel_ab_all, rel_ab_bact, rel_ab,
+    uid, mg_uid, sample_type, control_type,
+    total_non_human_reads, rel_ab_multi_genera, poor_quality_mg_data,
+    swab_barcode, 
+    starts_with("taxon"), full_taxonomy, 
+    strain_id, LBP, strain_origin
+  ) |> 
+  write_csv("VIBRANT-mg.csv", na = "")
+
+
+```
+
+
 ```{r}
  |> 
   mutate(

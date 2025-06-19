@@ -153,6 +153,7 @@ rel_abs <-
 ```
 
 ```{r}
+
 rel_abs <- 
   rel_abs |> 
   group_by(.feature) |> 
@@ -164,11 +165,14 @@ rel_abs <-
     taxon = 
       case_when(
         as.numeric(.feature) <= 29 ~ taxon_label,
-        TRUE ~ "Other"
+        (genus == "Lactobacillus") ~ "Other Lactobacillus",
+        TRUE ~ "Other non-Lacto."
       )
   ) |> 
   arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
-  mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other", after = Inf))
+  mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other Lactobacillus", "Other non-Lacto.", "Other", after = Inf))
+
+
 ```
 
 ```{r}
