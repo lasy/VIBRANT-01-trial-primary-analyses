@@ -54,20 +54,20 @@ total_rel_ab_of_LBP <-
 
 g_tot_prop_LBP_strains <- 
   total_rel_ab_of_LBP |>
-  filter(visit_type == "Clinic", !is.na(arm)) |> 
+  filter(visit_type == "Clinic", !is.na(arm), PIPV) |> 
   ggplot(aes(x = study_week, y = total_LBP_rel_ab, col = arm)) +
   geom_line(aes(group = pid), alpha = 0.5) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(site ~ arm) + 
-  scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
+  scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
   scale_y_continuous(
     "Total relative abundances\nof LBP strains", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
   expand_limits(y = 0) +
-  scale_color_manual(values = get_arm_colors()) +
+  scale_color_manual(values = arm_colors) +
   guides(col = "none") +
-  ggtitle(make_title(mae)) 
+  ggtitle(mae_title(mae)) 
 
 ```
 
@@ -85,7 +85,7 @@ g_tot_prop_LBP_strains
 
 g_prop_colonized_by <- 
   total_rel_ab_of_LBP |> 
-  filter(!is.na(arm)) |> 
+  filter(!is.na(arm), PIPV) |> 
   group_by(site, arm, study_week) |>
   summarize(
     prop_who_colonized_at = mean(total_LBP_rel_ab > 0.05), 
@@ -107,15 +107,15 @@ g_prop_colonized_by <-
   geom_line() +
   geom_point() +
   facet_grid(site ~ .) + 
-  scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
+  scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
   scale_y_continuous(
     "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
   expand_limits(y = 0) +
-  scale_color_manual("Arm", values = get_arm_colors()) +
-  scale_fill_manual("Arm", values = get_arm_colors()) +
-  ggtitle(make_title(mae)) 
+  scale_color_manual("Arm", values = arm_colors) +
+  scale_fill_manual("Arm", values = arm_colors) +
+  ggtitle(mae_title(mae)) 
 
 g_prop_colonized_by
 
@@ -185,12 +185,11 @@ rel_abs_agg <-
 
 
 
-```{r}
+```{r make-trajectories-plot}
 
 g_trajectories <-
   rel_abs_agg |>
-  mutate(study_week = case_when(visit_code == "0000" ~ -1, TRUE ~ study_week)) |>
-  filter(mITT, randomized != 0, visit_type == "Clinic", !is.na(study_week), !poor_quality_mg_data) |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
   group_by(pid) |> 
   mutate(
     tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
@@ -198,13 +197,16 @@ g_trajectories <-
     ) |> 
   ungroup() |> 
   arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
-  mutate(pid = pid |> fct_inorder()) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric()),
+    ) |> 
   ggplot(aes(y = rel_ab, x = pid, fill = taxon, alpha = ifelse(PP, "PP", "mITT"))) +
   geom_col() +
-  facet_grid(study_week ~ arm + site, scales = "free", space = "free") +
-  # theme(panel.spacing.x = unit(0, "points")) +
+  facet_grid(visit_label ~ arm + site, scales = "free", space = "free") +
   scale_fill_manual(
     values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
     guide = guide_legend(ncol = 1)
     ) +
   scale_alpha_discrete("Population", range = c(0.5, 1)) +
@@ -221,9 +223,10 @@ g_trajectories <-
 
 ```
 
-```{r}
+```{r display-trajectories-plot}
 #| fig-height: 9
-#| fig-width: 14
+#| fig-width: 15
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows. The alpha level (transparency) indicates whether the participant is part of the per-protocol (PP) or modified intention-to-treat (mITT) population."
 #| eval: true
 
 g_trajectories
@@ -300,9 +303,9 @@ LBP_strains |>
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = .feature, y = rel_ab, col = site) +
+  aes(x = .feature, y = rel_ab, col = site, fill = site) +
   # geom_point(alpha = 0.5, size = 0.5) +
-  geom_boxplot(outlier.size = 0.5) +
+  geom_boxplot(outlier.size = 0.5, alpha = 0.4) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   xlab("LBP strain") +
   scale_y_continuous(
@@ -310,6 +313,7 @@ LBP_strains |>
     breaks = seq(0, 1, by = 0.2)
   ) +
   scale_color_manual(values = site_colors) +
+  scale_fill_manual(values = site_colors) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
   ) 
@@ -334,7 +338,7 @@ LBP_strains |>
     breaks = seq(0, 1, by = 0.2)
   ) +
   #scale_color_manual(values = colorspace::darken(scale_colour_hue()$palette(2), amount = 0.4)) +
-  scale_color_manual("Strain origin", values = get_origin_colors()) +
+  scale_color_manual("Strain origin", values = strain_origin_colors) +
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)

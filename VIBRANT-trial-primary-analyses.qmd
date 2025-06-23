@@ -18,7 +18,7 @@ knitr:
 editor: source
 ---
 
-```{r}
+```{r libraries}
 #| warning: false
 #| cache: false
 
@@ -38,11 +38,16 @@ library(ggpubr)
 
 theme_set(theme_light())
 tmp <- fs::dir_map("R", source)
-tmp <- fs::dir_map("../VIBRANT-99-utils/R/", source)
 rm(tmp)
 
 ```
 
+```{r source-utils}
+#| warning: false
+#| cache: false
+tmp <- fs::dir_map("../VIBRANT-99-utils/R/", source)
+rm(tmp)
+```
 
 
 This document presents the primary analyses of the VIBRANT trial. 
@@ -51,7 +56,8 @@ This document presents the primary analyses of the VIBRANT trial.
 ## Loading the data
 
 
-```{r}
+```{r loading-mae}
+#| eval: true
 
 mae_files <- 
   fs::dir_ls(str_c(data_dir(), "04 unblinded MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
@@ -69,17 +75,20 @@ rm(mae_files)
 
 ## Demographics (Table 1)
 
-```{r child = '01-Demographics.qmd'}
+```{r 01-dem, child = '01-Demographics.qmd'}
+#| eval: true
 ```
 
 ## Primary outcomes (Table 2)
 
-```{r child = '02-primary-outcome.qmd'}
+```{r 02-primary, child = '02-primary-outcome.qmd'}
+#| eval: true
 ```
 
 ## Secondary outcomes (Figures 2-4)
 
-```{r child = '03-secondary-outcomes.qmd'}
+```{r 03-secondary, child = '03-secondary-outcomes.qmd'}
+#| eval: true
 ```
 
 
