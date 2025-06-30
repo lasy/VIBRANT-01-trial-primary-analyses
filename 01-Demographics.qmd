@@ -21,13 +21,15 @@ editor: source
 
 ### Summary table 
 
-We create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae`. 
+The demographics table is built as follow.
 
-This table contains almost all variables needed to create table 1 (*i.e., *`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method`).
+We first create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae`. 
+
+This table contains almost all variables needed to create the demographics table (*i.e., *`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method`).
 
 In addition, the `mae@colData` contains the participants' `arm` and study population flags (here we keep the `mITT` population). 
 
-From the variables listed above, we create the variable `food_insecurity` using the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`: if any of these three variables is "Yes", then the participant is considered to be affected by food insecurity.
+From the variables listed above, we create the variable `food_insecurity` using the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`: if a participant answered "Yes" to any of the corresponding questions, then she is considered to be affected by food insecurity.
 
 ```{r}
 
@@ -65,18 +67,18 @@ table1_data |>
 ```
 
 
-We also need to include the participants' partner's gender. 
+In addition to these variables, we also include the participants' partner's gender. 
 
-Participants are asked about their partner's gender at visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120 in CRF 19. 
+Participants are asked about their partner's gender at all weekly visits (1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120) using CRF 19. 
 
-The variable `past_week_sex_partner` of the `mae@metadata$visits_crfs_merged` table will be summarize into one of these 4 categories:
+Answers to that question can be found in the `past_week_sex_partner` column of the `mae@metadata$visits_crfs_merged` table. Participants' answer throughout the weekly visits will be summarized into one of these 4 categories:
 
 - No sex
 - Only male 
 - Only female
 - Both
 
-We add this variable to the `table1_data` table.
+This variable is added to the `table1_data` table.
 
 ```{r}
 
@@ -110,9 +112,13 @@ table1_data <-
 
 We also re-code the `race` variable as follows:
 
-- "Asian or South Asian" is re-coded to "Asian" (for brievity)
-- "Black, African American, or African" and "African" are re-coded to "Black" (for brievity)
+- "Asian or South Asian" is re-coded to "Asian" (for brevity)
+- "Black, African American, or African" and "African" are re-coded to "Black/African" (for brevity)
 - "Coloured", "White", "Other", and "Prefered not to answer" are left as is.
+
+:::callout-note
+@Disebo & Caroline: do we go for British or American English? (Colored vs Coloured)?
+:::
 
 
 ```{r}
@@ -126,8 +132,8 @@ table1_data <-
     race = fct_recode(
       race,
       "Asian" = "Asian or South Asian",
-      "Black" = "Black, African American, or African",
-      "Black" = "African",
+      "Black/African" = "Black, African American, or African",
+      "Black/African" = "African",
       "Coloured" = "Coloured",
       "White" = "White",
       "Other" = "Other",
@@ -148,8 +154,12 @@ table1_data <-
   )
 
 ```
+:::callout-warning
+@Laura Vermeren: I changed the summary statistics from mean to median for the continuous variables (for number of past sexual partner, the mean was artificially high in the arm with the 90 partner MGH participant). Would you be able to check that the tests selected by the `gt_summary` package are appropriate for the data we have? They should be, but I'd love if we could double-check :)
+:::
 
-Create Table 1 (by arm)
+
+### Table 1 (Population characteristics by arm)
 
 ```{r}
 
@@ -164,7 +174,7 @@ table1_data |>
         Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({min}-{max})",
+      all_continuous() ~ "{median} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
   )  |> 
@@ -172,8 +182,11 @@ table1_data |>
 
 ```
 
+Study population characteristics appear balanced across arms.
 
-Create Table 1 (by site)
+
+### Population characteristics by site
+
 
 ```{r}
 
@@ -188,7 +201,7 @@ table1_data |>
         Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({min}-{max})",
+      all_continuous() ~ "{median} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
   )  |> 
@@ -197,10 +210,11 @@ table1_data |>
 
 ```
 
-And finally we create one Table 1 for each site 
+There are, unsurprisingly, striking differences in study population characteristics by site.
+
+### Population characteristics by arm, split by site
 
 ```{r}
-
 
 table1_data |> 
   filter(site == "CAP") |> 
@@ -214,7 +228,7 @@ table1_data |>
         Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({min}-{max})",
+      all_continuous() ~ "{median} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
   ) |> 
@@ -233,7 +247,7 @@ table1_data |>
         Sexual_partners_lifetime ~ "continuous"
       ),
     statistic = list(
-      all_continuous() ~ "{mean} ({min}-{max})",
+      all_continuous() ~ "{median} ({min}-{max})",
       all_categorical() ~ "{n} ({p}%)"
     )
   ) |> 
@@ -243,6 +257,34 @@ table1_data |>
 
 ```
 
+Study population characteristics appear balanced across arms at the CAPRISA site. Given the low number of participants at the MGH site in two of the five arms, we create an additional table excluding these two arms.
+
+```{r}
+
+table1_data |> 
+  filter(site == "MGH", !(arm %in% c("LC-106-o", "LC-106-3"))) |> 
+  mutate(arm = arm |> fct_drop()) |> 
+  select(-c(pid, site)) |>
+  rename_with(~ str_to_title(.x)) |>  
+  tbl_summary(
+    by = Arm,
+    type =
+      list(
+        Sexual_partners_past_month ~ "continuous",
+        Sexual_partners_lifetime ~ "continuous"
+      ),
+    statistic = list(
+      all_continuous() ~ "{median} ({min}-{max})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |> 
+  add_p()|>
+  modify_caption("**Site = MGH**")
+
+
+```
+
+Besides the number of lifetime sexual partners, arms appear balanced across arm at MGH.
 
 
 

@@ -24,7 +24,7 @@ editor: source
 
 ### Kinetics of colonization
 
-#### Total relative abundances of LBP isolates
+#### Total relative abundances of LBP strains
 
 ```{r}
 
@@ -46,6 +46,20 @@ total_rel_ab_of_LBP <-
 total_rel_ab_of_LBP <- 
   total_rel_ab_of_LBP |> 
   dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid))
+
+
+total_rel_ab_of_LBP <- 
+  total_rel_ab_of_LBP |> 
+  left_join(
+    total_rel_ab_of_LBP |> 
+      select(pid, arm, site) |> 
+      distinct() |> 
+      group_by(arm, site) |> 
+      arrange(pid) |> 
+      mutate(pid_nb = row_number()) |> 
+      ungroup()
+  )
+
   
 ```
 
@@ -72,56 +86,154 @@ g_tot_prop_LBP_strains <-
 ```
 
 ```{r}
+#| fig-width: 10
 
 g_tot_prop_LBP_strains
 
 ```
 
 
-#### Proportions of participants who colonized
+```{r}
+#| fig-width: 10
+
+g_tot_prop_LBP_strains +
+  geom_label(aes(label = pid_nb), size = 2) +
+  labs(
+    caption = "Participants are labeled by their enrollment order within each arm and site."
+  )
+
+```
+
+
+#### Proportions of participants who colonized in each arm and each visit
+
+```{r}
+
+get_longitudinal_proportions_of_participants_who_colonized <- 
+  function(total_rel_ab_of_LBP) {
+    total_rel_ab_of_LBP |> 
+      filter(!is.na(arm), PIPV) |> 
+      group_by(site, arm, study_week) |>
+      summarize(
+        prop_who_colonized_at = mean(total_LBP_rel_ab > 0.05), 
+        CI_low = 
+          prop.test(
+            x = sum(total_LBP_rel_ab > 0.05), n = n(), 
+            conf.level = 0.95)$conf.int[1],
+        CI_high = 
+          prop.test(
+            x = sum(total_LBP_rel_ab > 0.05), n = n(), 
+            conf.level = 0.95)$conf.int[2],
+        .groups = "drop"
+      )
+  }
+
+plot_longitudinal_proportions_of_participants_who_colonized <- 
+  function(total_rel_ab_of_LBP, mae){
+    
+    get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP) |>
+      ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
+      geom_ribbon(
+        aes(ymin = CI_low, ymax = CI_high, fill = arm), 
+        alpha = 0.1, color = NA
+      ) +
+      geom_line() +
+      geom_point() +
+      facet_grid(site ~ .) + 
+      scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
+      scale_y_continuous(
+        "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
+        breaks = seq(0, 1, by = 0.2)
+      ) +
+      expand_limits(y = 0) +
+      scale_color_manual("Arm", values = arm_colors) +
+      scale_fill_manual("Arm", values = arm_colors) +
+      ggtitle(mae_title(mae)) 
+  }
+
+```
+
 
 
 ```{r}
 
-g_prop_colonized_by <- 
-  total_rel_ab_of_LBP |> 
-  filter(!is.na(arm), PIPV) |> 
-  group_by(site, arm, study_week) |>
-  summarize(
-    prop_who_colonized_at = mean(total_LBP_rel_ab > 0.05), 
-    CI_low = 
-      prop.test(
-        x = sum(total_LBP_rel_ab > 0.05), n = n(), 
-        conf.level = 0.95)$conf.int[1],
-    CI_high = 
-      prop.test(
-        x = sum(total_LBP_rel_ab > 0.05), n = n(), 
-        conf.level = 0.95)$conf.int[2],
-    .groups = "drop"
-  ) |>
-  ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
-  geom_ribbon(
-    aes(ymin = CI_low, ymax = CI_high, fill = arm), 
-    alpha = 0.1, color = NA
-  ) +
-  geom_line() +
-  geom_point() +
-  facet_grid(site ~ .) + 
-  scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
-  scale_y_continuous(
-    "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
-    breaks = seq(0, 1, by = 0.2)
-  ) +
-  expand_limits(y = 0) +
-  scale_color_manual("Arm", values = arm_colors) +
-  scale_fill_manual("Arm", values = arm_colors) +
-  ggtitle(mae_title(mae)) 
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP, mae)
 
 g_prop_colonized_by
 
 ```
 
 
+
+```{r}
+
+g_prop_colonized_by <- 
+  plot_longitudinal_proportions_of_participants_who_colonized(
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH"))), 
+    mae
+    )
+
+g_prop_colonized_by
+
+```
+
+
+
+```{r}
+
+plot_longitudinal_proportions_of_participants_who_colonized_v2 <- 
+  function(total_rel_ab_of_LBP, mae){
+    
+    get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP) |>
+      ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
+      geom_linerange(
+        aes(ymin = CI_low, ymax = CI_high, col = arm), 
+        alpha = 0.4, lineend = "round", linewidth = 1,
+        position = position_dodge(width = 0.5)
+      ) +
+      geom_line(position = position_dodge(width = 0.5), linewidth = 0.8) +
+      geom_point(aes(shape = arm), position = position_dodge(width = 0.5), size = 2) +
+      facet_grid(site ~ .) + 
+      scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) +
+      scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
+      scale_y_continuous(
+        "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
+        breaks = seq(0, 1, by = 0.2)
+      ) +
+      expand_limits(y = 0) +
+      scale_color_manual("Arm", values = arm_colors) +
+      scale_fill_manual("Arm", values = arm_colors) +
+      ggtitle(mae_title(mae)) 
+    
+  }
+
+```
+
+
+Alternative visualization:
+
+
+```{r}
+
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized_v2(total_rel_ab_of_LBP, mae)
+
+g_prop_colonized_by
+
+```
+
+
+
+```{r}
+
+g_prop_colonized_by <- 
+  plot_longitudinal_proportions_of_participants_who_colonized_v2(
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH"))), 
+    mae
+    )
+
+g_prop_colonized_by
+
+```
 
 
 #### Figure 2
@@ -139,6 +251,8 @@ g_prop_colonized_by
 ```
 
 ### Microbiota trajectories
+
+Longitudinal stack relative abundances plot:
 
 ```{r}
 
@@ -281,12 +395,15 @@ LBP_strains <-
 ```
 
 ```{r}
+#| fig-height: 6
+#| fig-width: 8
 
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
   aes(x = .feature, y = rel_ab, col = site) +
-  geom_point(alpha = 0.5, size = 0.5) +
+  # geom_point(alpha = 0.5, size = 0.5, position = position_dodge(width = 0.5)) +
+  ggbeeswarm::geom_quasirandom(alpha = 0.5, size = 0.5, dodge.width = 0.5) +
   # geom_boxplot(outlier.size = 0.5) +
   facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   xlab("LBP strain") +
@@ -345,6 +462,247 @@ LBP_strains |>
   ) 
 
 ```
+
+
+## Proportion colonized among exposed
+
+```{r}
+
+tmp <- 
+  # we use the metagenomics data for this
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(!is.na(LBP), !poor_quality_mg_data) |> 
+  select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
+  # add the arm, mITT, etc.
+  left_join(
+    mae |> colData() |> as_tibble() |> select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
+    by = join_by(uid)
+  ) |>
+  # only consider the mITT
+  filter(randomized, mITT) |> 
+  filter(PIPV, as.numeric(visit_code) >= 1200) |> # only include visits after the first 2 weeks
+  # define the outcome of interest for each person and strain
+  group_by(.feature, LBP, strain_origin, pid, arm, site) |>
+  summarize(
+    ever_colonized = any(rel_ab >= 0.05, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  # exclude Placebo participants because, they were, in theory, not exposed to any of the strains.
+  filter(arm != "Pl") |> 
+  # define the total number of participants exposed for each strain.
+  # For LC-115 strains, this is only participants of arm LC-115
+  # For LC-106 strains, this is participants from all active arms.
+  mutate(
+    exposed = case_when(
+      LBP == "LC-115" ~ (arm == "LC-115"),
+      LBP == "LC-106 & LC-115" ~ TRUE,
+      TRUE ~ FALSE
+    )
+  ) |> 
+  # we compute the statistics of interest
+  group_by(.feature, LBP, strain_origin, site) |> 
+  summarize(
+    n_exposed = sum(exposed, na.rm = TRUE),
+    n_colonized = sum(ever_colonized & exposed, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    prop_colonized = n_colonized / n_exposed,
+    CI_low = binom::binom.confint(n_colonized, n_exposed, method = "wilson")$lower,
+    CI_high = binom::binom.confint(n_colonized, n_exposed, method = "wilson")$upper
+  )
+
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+
+tmp |> 
+  ggplot() +
+  aes(x = .feature, y = prop_colonized, col = site) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
+  geom_errorbar(
+    aes(ymin = CI_low, ymax = CI_high), 
+    linewidth = 1, alpha = 0.7,
+    width = 0.3, position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_color_manual("Study site", values = site_colors) +
+  xlab("LBP strain") + 
+  ylab("Proportion of participants colonized\namong those exposed") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+  
+```
+
+
+
+```{r}
+
+tmp |> 
+  mutate(
+    CI = str_c(
+      "[", 
+      scales::percent(CI_low, accuracy = 1), 
+      " - ", 
+      scales::percent(CI_high, accuracy = 1), 
+      "]"
+    ),
+    value = 
+      str_c(
+        scales::percent(prop_colonized, accuracy = 1), 
+        " (", n_colonized, "/", n_exposed,")<br>",
+       CI
+      ),
+    strain_info = str_c(LBP, "<br>(", strain_origin, " strains)")
+  ) |> 
+  select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
+  pivot_wider(
+    names_from = c(site), 
+    values_from = value
+  ) |>
+  arrange(strain_info) |> 
+  group_by(strain_info) |> 
+  gt(
+    row_group_as_column = TRUE, 
+    process_md = TRUE,
+    caption = "Proportion of mITT participants exposed to a given strain who colonized with that strain (colonization defined as a ≥ 5% relative abundance by metagenomics) at any weekly visit after product exposure."
+  ) |> 
+  cols_label(.feature = "LBP strain") |> 
+  cols_align(columns = .feature, align = "left") |> 
+  cols_align(columns = c("CAP", "MGH"), align = "center") |>
+  fmt_markdown(columns = everything()) 
+
+
+```
+
+
+### Excluding immediate post-product visit
+
+```{r}
+
+tmp <- 
+  # we use the metagenomics data for this
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(!is.na(LBP), !poor_quality_mg_data) |> 
+  select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
+  # add the arm, mITT, etc.
+  left_join(
+    mae |> colData() |> as_tibble() |> 
+      select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
+    by = join_by(uid)
+  ) |>
+  # only consider the mITT
+  filter(randomized, mITT) |> 
+  mutate(
+    include_visit = 
+      case_when(
+        (arm %in% c("LC-106-7", "LC-115")) & as.numeric(visit_code) > 1200 ~ TRUE,
+        (arm %in% c("LC-106-3", "LC-106-o")) & as.numeric(visit_code) >= 1200 ~TRUE,
+        TRUE ~ FALSE
+      )
+  ) |> 
+  filter(PIPV, include_visit) |> # only include visits after the first 2 weeks
+  # define the outcome of interest for each person and strain
+  group_by(.feature, LBP, strain_origin, pid, arm, site) |>
+  summarize(
+    ever_colonized = any(rel_ab >= 0.05, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  # exclude Placebo participants because, they were, in theory, not exposed to any of the strains.
+  filter(arm != "Pl") |> 
+  # define the total number of participants exposed for each strain.
+  # For LC-115 strains, this is only participants of arm LC-115
+  # For LC-106 strains, this is participants from all active arms.
+  mutate(
+    exposed = case_when(
+      LBP == "LC-115" ~ (arm == "LC-115"),
+      LBP == "LC-106 & LC-115" ~ TRUE,
+      TRUE ~ FALSE
+    )
+  ) |> 
+  # we compute the statistics of interest
+  group_by(.feature, LBP, strain_origin, site) |> 
+  summarize(
+    n_exposed = sum(exposed, na.rm = TRUE),
+    n_colonized = sum(ever_colonized & exposed, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    prop_colonized = n_colonized / n_exposed,
+    CI_low = binom::binom.confint(n_colonized, n_exposed, method = "wilson")$lower,
+    CI_high = binom::binom.confint(n_colonized, n_exposed, method = "wilson")$upper
+  )
+
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+
+tmp |> 
+  ggplot() +
+  aes(x = .feature, y = prop_colonized, col = site) +
+  facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
+  geom_errorbar(
+    aes(ymin = CI_low, ymax = CI_high), 
+    linewidth = 1, alpha = 0.7,
+    width = 0.3, position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_color_manual("Study site", values = site_colors) +
+  xlab("LBP strain") + 
+  ylab("Proportion of participants colonized\namong those exposed") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+  
+```
+
+
+```{r}
+
+tmp |> 
+  mutate(
+    CI = str_c(
+      "[", 
+      scales::percent(CI_low, accuracy = 1), 
+      " - ", 
+      scales::percent(CI_high, accuracy = 1), 
+      "]"
+    ),
+    value = 
+      str_c(
+        scales::percent(prop_colonized, accuracy = 1), 
+        " (", n_colonized, "/", n_exposed,")<br>",
+       CI
+      ),
+    strain_info = str_c(LBP, "<br>(", strain_origin, " strains)")
+  ) |> 
+  select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
+  pivot_wider(
+    names_from = c(site), 
+    values_from = value
+  ) |>
+  arrange(strain_info) |> 
+  group_by(strain_info) |> 
+  gt(
+    row_group_as_column = TRUE, 
+    process_md = TRUE,
+    caption = "Proportion of mITT participants exposed to a given strain who colonized with that strain (colonization defined as a ≥ 5% relative abundance by metagenomics) at any weekly visit after product exposure but excluding immediate post-product visit (i.e., excluding week 2 visit for the LC-106-7 and LC-115 arms)."
+  ) |> 
+  cols_label(.feature = "LBP strain") |> 
+  cols_align(columns = .feature, align = "left") |> 
+  cols_align(columns = c("CAP", "MGH"), align = "center") |>
+  fmt_markdown(columns = everything()) 
+
+
+```
+
 
 
 
