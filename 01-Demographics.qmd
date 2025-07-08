@@ -140,7 +140,8 @@ table1_data <-
       "Prefer not to answer" = "Prefer not to answer"
     ),
     
-    race = fct_relevel(race, "Asian", "Black", "Coloured", "White", "Other", "Prefer not to answer"),
+    race = fct_relevel(race, "Asian", "Black/African", "Coloured", "White", "Other", "Prefer not to answer"),
+    race = race |> fct_drop(),
     arm = arm |> fct_drop()
   ) |>
   
