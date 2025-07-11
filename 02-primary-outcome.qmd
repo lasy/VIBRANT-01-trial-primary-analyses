@@ -19,7 +19,7 @@ editor: source
 ---
 
 
-### Colonization by week 5
+### LBP colonization by week 5
 
 The primary outcome is defined as "Colonization by any of the LBP strains after product administration by week 5", and colonization by any of the LBP strain is defined as a relative abundance of 5% by any single strain or 10% total relative abundance of the LBP strains. The relative abundance of LBP strain is estimated using metagenomics (taxonomic composition estimated using VIRGO2 and strain proportion of total *L. crispatus* is estimated using kSanity), and includes samples from weekly visits 1200 to 1500 (week 2 (post-INT) to week 5 (3 weeks post-INT)). 
 
@@ -43,62 +43,6 @@ col_by_week5 <-
   ) |> 
   mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
   
-
-# by qPCR 
-
-col_by_week5_qPCR <-
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_LBP_qPCR"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_qpcr")
-  ) |> 
-  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
-
-
-detected_by_week5_qPCR <-
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_LBP_qPCR"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code == "1500", .feature == "LBP_detected_by_qpcr")
-  ) |> 
-  mutate(LBP_detected_by_week5 = outcome |> replace_na(FALSE)) 
-
-
-# crispatus dominance 
-
-crisp_dom_by_5week <- 
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_crispatus_mg"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code == "1500", .feature == "crispatus_dominance_by_mg")
-  ) |> 
-  mutate(crisp_dom_by_5week = outcome |> replace_na(FALSE)) 
-  
-
 ```
 
 
@@ -176,7 +120,7 @@ table_2 |>
 
 
 
-**Visualization of the primary outcome** (and a few selected secondary outcomes)
+**Visualization of the primary outcome**
 
 ```{r}
 #| fig-width: 10
@@ -197,86 +141,6 @@ col_by_week5 |>
   theme(
     legend.position = "top",
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
-  ) 
-
-
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 2
-
-
-col_by_week5_qPCR |> 
-  arrange(site, arm, LBP_colonization_by_week5) |>
-  group_by(site, arm) |> 
-  mutate(participant_number = row_number() |> factor()) |> 
-  ungroup() |> 
-  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = LBP_colonization_by_week5)) +
-  geom_point(size = 3) +
-  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
-  guides(color = "none", fill = "none") +
-  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = site_colors) + 
-  xlab("Participant number") + ylab("") +
-  ggtitle("Colonization based on the relative abundances estimated by qPCR") +
-  theme(
-    legend.position = "top",
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-    plot.title = element_text(hjust = 0.5)
-  ) 
-
-```
-
-
-```{r}
-#| fig-width: 10
-#| fig-height: 2
-
-
-detected_by_week5_qPCR |> 
-  arrange(site, arm, LBP_detected_by_week5) |>
-  group_by(site, arm) |> 
-  mutate(participant_number = row_number() |> factor()) |> 
-  ungroup() |> 
-  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = LBP_detected_by_week5)) +
-  geom_point(size = 3) +
-  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
-  guides(color = "none", fill = "none") +
-  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = site_colors) + 
-  xlab("Participant number") + ylab("") +
-  ggtitle("Colonization based on qPCR-based detection of at least 2 LBP strains detected at the same visit by week 5") +
-  theme(
-    legend.position = "top",
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-    plot.title = element_text(hjust = 0.5)
-  ) 
-
-```
-
-
-```{r}
-#| fig-width: 10
-#| fig-height: 2
-
-crisp_dom_by_5week |> 
-  arrange(site, arm, crisp_dom_by_5week) |>
-  group_by(site, arm) |> 
-  mutate(participant_number = row_number() |> factor()) |> 
-  ungroup() |> 
-  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = crisp_dom_by_5week)) +
-  geom_point(size = 3) +
-  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
-  guides(color = "none", fill = "none") +
-  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
-  scale_color_manual(values = site_colors) + 
-  xlab("Participant number") + ylab("") +
-  ggtitle("L. crispatus dominance (≥ 50% by metagenomics)") +
-  theme(
-    legend.position = "top",
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-    plot.title = element_text(hjust = 0.5)
   ) 
 
 
@@ -386,9 +250,6 @@ table_2_with_model_results |>
   )
   
 ```
-
-
-
 
 
 #### Model
@@ -556,7 +417,10 @@ table_2_with_model_results |>
 
 
 
-### Colonization by week 5 (Sensitivity analysis excluding immediately post-product visits)
+## Sensitivity analyses (Supplementary tables and figures)
+
+
+### LBP colonization by week 5 excluding immediately post-product visits
 
 
 **Defining the alternative primary outcome**
@@ -707,8 +571,7 @@ col_by_week5 |>
 
 ```
 
-**Results** 
-
+**Table** 
 
 ```{r}
 
@@ -757,36 +620,6 @@ table_2 <-
 ```
 
 
-
-```{r}
-
-table_2 |> 
-  group_by(site) |> 
-  gt(
-    caption = "Table 1: Colonization by week 5 by arm and site (excluding immediately post-product visit)", 
-     row_group_as_column = TRUE
-     ) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    # Blinded = "All blinded arms",
-    Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-  
-```
-
-
-#### Tests 
-
-Same tests as above.
 
 ```{r}
 
@@ -846,14 +679,14 @@ test_results <-
 table_2_with_model_results <- 
   bind_rows(
     table_2,
-    test_results
+    test_results |> filter(name != "Adj. p-value")
   ) |> 
   mutate(
     site = site |> str_replace_na(""),
     Pl = 
       case_when(
         name == "Adj. p-value" ~ "Ref.",
-        name == "OR" ~ "",
+        name == "OR" ~ "Ref.",
         str_detect(name, "CI") ~ "",
         TRUE ~ Pl
       )
@@ -867,7 +700,411 @@ table_2_with_model_results <-
 table_2_with_model_results |> 
   group_by(site) |>
   gt(
-    caption = "Table 2: Colonization by week 5 by arm and site (excluding immediately post-product visit)", 
+    caption = "LBP Colonization by week 5 by arm and site excluding immediately post-product visit.", 
+    row_group_as_column = TRUE
+    ) |> 
+  cols_width(
+    "name" ~ px(150),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+  
+```
+
+### LBP colonization by week 5, qPCR-estimated relative abundances
+
+These analyses include the immediate post-product visits.
+
+```{r}
+
+# by qPCR 
+
+col_by_week5_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_qpcr")
+  ) |> 
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
+
+```
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 2
+
+
+col_by_week5_qPCR |> 
+  arrange(site, arm, LBP_colonization_by_week5) |>
+  group_by(site, arm) |> 
+  mutate(participant_number = row_number() |> factor()) |> 
+  ungroup() |> 
+  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = LBP_colonization_by_week5)) +
+  geom_point(size = 3) +
+  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
+  guides(color = "none", fill = "none") +
+  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
+  scale_color_manual(values = site_colors) + 
+  xlab("Participant number") + ylab("") +
+  ggtitle("Colonization based on the relative abundances estimated by qPCR") +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+    plot.title = element_text(hjust = 0.5)
+  ) 
+
+```
+
+
+**Table** 
+
+```{r}
+
+summary_table <- 
+  col_by_week5_qPCR |> 
+  group_by(site, arm) |> 
+  summarize(
+    n = n(), 
+    n_success = sum(LBP_colonization_by_week5),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+```{r}
+
+table_2 <- 
+  summary_table |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+```
+
+
+
+```{r}
+
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
+
+fisher_test_results <-
+  map(
+  arms_to_test,
+  ~ {
+    arm_to_test <- .x
+    tmp <- col_by_week5_qPCR |> filter(arm %in% c("Pl", arm_to_test))
+    table_for_test <- table(tmp$LBP_colonization_by_week5, tmp$arm |> fct_drop())
+    test_res <- fisher.test(table_for_test, alternative = "greater")
+    tibble(
+      arm = arm_to_test,
+      p_value = test_res$p.value,
+      OR = test_res$estimate,
+      lower_CI = test_res$conf.int[1],
+      upper_CI = test_res$conf.int[2]
+    )
+  }
+) |> 
+  bind_rows() |> 
+  mutate(
+    adj_p_value = p_value |> p.adjust(method = "BH")
+  )
+  
+```
+
+
+```{r}
+
+test_results <- 
+  fisher_test_results |> 
+  mutate(
+    adj_p_value = adj_p_value |> scales::pvalue(accuracy = 0.001),
+    OR = OR |> round(2) |> as.character(),
+    CI = str_c(lower_CI |> round(2), " - ", upper_CI |> round(2))
+    ) |> 
+  select(arm, adj_p_value, OR, CI) |>
+  pivot_longer(cols = -arm, names_to = "name", values_to = "value") |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  mutate(
+    name = 
+      case_when(
+        name == "adj_p_value" ~ "Adj. p-value",
+        name == "OR" ~ "OR",
+        name == "CI" ~ "95% CI",
+        TRUE ~ name
+      )
+  )
+  
+```
+
+```{r}
+
+table_2_with_model_results <- 
+  bind_rows(
+    table_2,
+    test_results |> filter(name != "Adj. p-value")
+  ) |> 
+  mutate(
+    site = site |> str_replace_na(""),
+    Pl = 
+      case_when(
+        name == "Adj. p-value" ~ "Ref.",
+        name == "OR" ~ "Ref.",
+        str_detect(name, "CI") ~ "",
+        TRUE ~ Pl
+      )
+  )
+
+```
+
+
+```{r}
+
+table_2_with_model_results |> 
+  group_by(site) |>
+  gt(
+    caption = "LBP Colonization by week 5 by arm, with colonization definition based on qPCR-estimated relative abundance.", 
+    row_group_as_column = TRUE
+    ) |> 
+  cols_width(
+    "name" ~ px(150),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+  
+```
+
+
+### LBP **detection** by week 5, qPCR-based detection
+
+In this analysis, LBP is considered to be *detected* if at least 2 LBP strains had observed Cq values at the same visit by week 5. "By week 5" includes all post-product visits from `visit_code = 1200` (no excluding the immediate post-product visits.
+
+```{r}
+
+detected_by_week5_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "LBP_detected_by_qpcr")
+  ) |> 
+  mutate(LBP_detected_by_week5 = outcome |> replace_na(FALSE)) 
+
+
+```
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 2
+
+
+detected_by_week5_qPCR |> 
+  arrange(site, arm, LBP_detected_by_week5) |>
+  group_by(site, arm) |> 
+  mutate(participant_number = row_number() |> factor()) |> 
+  ungroup() |> 
+  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = LBP_detected_by_week5)) +
+  geom_point(size = 3) +
+  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
+  guides(color = "none", fill = "none") +
+  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
+  scale_color_manual(values = site_colors) + 
+  xlab("Participant number") + ylab("") +
+  ggtitle("Colonization based on qPCR-based detection of at least 2 LBP strains detected at the same visit by week 5") +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+    plot.title = element_text(hjust = 0.5)
+  ) 
+
+```
+
+
+**Table** 
+
+```{r}
+
+summary_table <- 
+  detected_by_week5_qPCR |> 
+  group_by(site, arm) |> 
+  summarize(
+    n = n(), 
+    n_success = sum(LBP_detected_by_week5),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+```{r}
+
+table_2 <- 
+  summary_table |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+```
+
+
+
+```{r}
+
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
+
+fisher_test_results <-
+  map(
+  arms_to_test,
+  ~ {
+    arm_to_test <- .x
+    tmp <- detected_by_week5_qPCR |> filter(arm %in% c("Pl", arm_to_test))
+    table_for_test <- table(tmp$LBP_detected_by_week5, tmp$arm |> fct_drop())
+    test_res <- fisher.test(table_for_test, alternative = "greater")
+    tibble(
+      arm = arm_to_test,
+      p_value = test_res$p.value,
+      OR = test_res$estimate,
+      lower_CI = test_res$conf.int[1],
+      upper_CI = test_res$conf.int[2]
+    )
+  }
+) |> 
+  bind_rows() |> 
+  mutate(
+    adj_p_value = p_value |> p.adjust(method = "BH")
+  )
+  
+```
+
+
+```{r}
+
+test_results <- 
+  fisher_test_results |> 
+  mutate(
+    adj_p_value = adj_p_value |> scales::pvalue(accuracy = 0.001),
+    OR = OR |> round(2) |> as.character(),
+    CI = str_c(lower_CI |> round(2), " - ", upper_CI |> round(2))
+    ) |> 
+  select(arm, adj_p_value, OR, CI) |>
+  pivot_longer(cols = -arm, names_to = "name", values_to = "value") |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  mutate(
+    name = 
+      case_when(
+        name == "adj_p_value" ~ "Adj. p-value",
+        name == "OR" ~ "OR",
+        name == "CI" ~ "95% CI",
+        TRUE ~ name
+      )
+  )
+  
+```
+
+```{r}
+
+table_2_with_model_results <- 
+  bind_rows(
+    table_2,
+    test_results |> filter(name != "Adj. p-value")
+  ) |> 
+  mutate(
+    site = site |> str_replace_na(""),
+    Pl = 
+      case_when(
+        name == "Adj. p-value" ~ "Ref.",
+        name == "OR" ~ "Ref.",
+        str_detect(name, "CI") ~ "",
+        TRUE ~ Pl
+      )
+  )
+
+```
+
+
+```{r}
+
+table_2_with_model_results |> 
+  group_by(site) |>
+  gt(
+    caption = "LBP detection by week 5 by arm, with LBP detection defined as at least two LBP strains simultaneously detected by qPCR.", 
     row_group_as_column = TRUE
     ) |> 
   cols_width(
@@ -889,25 +1126,108 @@ table_2_with_model_results |>
 
 
 
+### *L. crispatus* dominance by week 5
 
-#### Model
+In this analysis, *L. crispatus* dominance is defined as a metagenomic-estimated relative abundance ≥ 50%. "By week 5" includes all post-product visits from `visit_code = 1200` (no excluding the immediate post-product visits.
 
-
-[As above, this section still needs more work given the low sample size in some of the arms. Code is not executed]. 
 
 ```{r}
-#| eval: false
 
-col_by_week5_agg <- 
-  col_by_week5 |>
-  group_by(site, arm) |>
-  summarise(success = LBP_colonization_by_week5 |> sum(), ntrials = n()) 
 
-bfit <- 
-  brm(
-    success | trials(ntrials) ~ arm + site + site:arm, 
-    data = col_by_week5_agg, 
-    family = binomial("logit")
+# crispatus dominance 
+
+crisp_dom_by_5week <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_crispatus_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "crispatus_dominance_by_mg")
+  ) |> 
+  mutate(crisp_dom_by_5week = outcome |> replace_na(FALSE)) 
+  
+
+```
+
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 2
+
+crisp_dom_by_5week |> 
+  arrange(site, arm, crisp_dom_by_5week) |>
+  group_by(site, arm) |> 
+  mutate(participant_number = row_number() |> factor()) |> 
+  ungroup() |> 
+  ggplot(aes(x = participant_number, y = site |> fct_rev(), col = site, fill = site, shape = crisp_dom_by_5week)) +
+  geom_point(size = 3) +
+  facet_grid(. ~ arm, scales = "free_x", space = "free_x") +
+  guides(color = "none", fill = "none") +
+  scale_shape_manual("Colonized by LBP by week 5", values = c(1, 16)) +
+  scale_color_manual(values = site_colors) + 
+  xlab("Participant number") + ylab("") +
+  ggtitle("L. crispatus dominance (≥ 50% by metagenomics)") +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+    plot.title = element_text(hjust = 0.5)
+  ) 
+
+
+```
+
+
+**Table** 
+
+```{r}
+
+summary_table <- 
+  crisp_dom_by_5week |> 
+  group_by(site, arm) |> 
+  summarize(
+    n = n(), 
+    n_success = sum(crisp_dom_by_5week),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+```{r}
+
+table_2 <- 
+  summary_table |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    Lc_dom = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, Lc_dom, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants",
+        name == "Lc_dom" ~ "n (%) participants\n≥ 50% L. crispatus",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
     )
 
 ```
@@ -915,113 +1235,72 @@ bfit <-
 
 
 ```{r}
-#| eval: false
-summary(bfit)
-plot(bfit, ask = FALSE)
-bind_cols(col_by_week5_agg, predict(bfit))
-# loo(bfit, moment_match = TRUE, reloo = TRUE)
-# pp_check(bfit)
-```
 
-```{r}
-#| eval: false
-#| output: false
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
 
-plot_res <- plot(conditional_effects(bfit), ask = FALSE)
-
-```
-
-
-
-```{r}
-#| eval: false
-#| fig-width: 10
-#| fig-height: 4
-
-plot_res <- lapply(plot_res, function(p) {
-  p + scale_color_manual(values = site_colors)
-})
-
-Reduce(`+`, plot_res) + 
-  plot_layout(widths = c(2.2, 1, 3))
-
-```
-
-
-
-
-```{r}
-#| eval: false
-
-model_results <- summary(bfit)$fixed
-model_results <- 
-  model_results |> 
-  rownames_to_column("term") |> 
-  as_tibble() |> 
+fisher_test_results <-
+  map(
+  arms_to_test,
+  ~ {
+    arm_to_test <- .x
+    tmp <- crisp_dom_by_5week |> filter(arm %in% c("Pl", arm_to_test))
+    table_for_test <- table(tmp$crisp_dom_by_5week, tmp$arm |> fct_drop())
+    test_res <- fisher.test(table_for_test, alternative = "greater")
+    tibble(
+      arm = arm_to_test,
+      p_value = test_res$p.value,
+      OR = test_res$estimate,
+      lower_CI = test_res$conf.int[1],
+      upper_CI = test_res$conf.int[2]
+    )
+  }
+) |> 
+  bind_rows() |> 
   mutate(
-    factor = 
-      case_when(
-        str_detect(term, ":site") ~ "Arm x Site",
-        str_detect(term, "^site") ~ "Site",
-        str_detect(term, "^arm") ~ "Arm",
-        TRUE ~ "Ref.",
-      ),
-    factor_level = 
-      term |> 
-      str_remove("arm") |> str_remove("site") |> str_replace(":"," x ") |> 
-      str_replace("6M", "6-") |> str_replace("CM", "C-")
-  ) |> 
-  mutate(
-    OR = ifelse(factor == "Ref.", NA, exp(Estimate)),
-    lower_CI = ifelse(factor == "Ref.", NA, exp(`l-95% CI`)),
-    upper_CI = ifelse(factor == "Ref.", NA, exp(`u-95% CI`))
-  ) 
-
-```
-
-```{r}
-#| eval: false
-
-model_results |> 
-  select(factor, factor_level, OR, lower_CI, upper_CI) |>
-  gt() |> 
-  gt::fmt_number(
-    decimals = 2, n_sigfig = 3
+    adj_p_value = p_value |> p.adjust(method = "BH")
   )
-
+  
 ```
 
 
 ```{r}
-#| eval: false
 
-model_results_arm <- 
-  model_results |> 
-  filter(factor == "Arm") |> 
+test_results <- 
+  fisher_test_results |> 
   mutate(
+    adj_p_value = adj_p_value |> scales::pvalue(accuracy = 0.001),
     OR = OR |> round(2) |> as.character(),
     CI = str_c(lower_CI |> round(2), " - ", upper_CI |> round(2))
     ) |> 
-  select(factor_level, OR, CI) |>
-  pivot_longer(cols = -factor_level, names_to = "name", values_to = "value") |>
-  pivot_wider(names_from = factor_level, values_from = value) 
+  select(arm, adj_p_value, OR, CI) |>
+  pivot_longer(cols = -arm, names_to = "name", values_to = "value") |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  mutate(
+    name = 
+      case_when(
+        name == "adj_p_value" ~ "Adj. p-value",
+        name == "OR" ~ "OR",
+        name == "CI" ~ "95% CI",
+        TRUE ~ name
+      )
+  )
   
 ```
 
 ```{r}
-#| eval: false
 
 table_2_with_model_results <- 
   bind_rows(
     table_2,
-    model_results_arm
+    test_results |> filter(name != "Adj. p-value")
   ) |> 
   mutate(
     site = site |> str_replace_na(""),
     Pl = 
       case_when(
+        name == "Adj. p-value" ~ "Ref.",
         name == "OR" ~ "Ref.",
-        name == "CI" ~ "",
+        str_detect(name, "CI") ~ "",
         TRUE ~ Pl
       )
   )
@@ -1029,16 +1308,16 @@ table_2_with_model_results <-
 ```
 
 
-
-
 ```{r}
-#| eval: false
 
 table_2_with_model_results |> 
   group_by(site) |>
-  gt(caption = "Table 2: Colonization by week 5 by arm and site", row_group_as_column = TRUE) |> 
+  gt(
+    caption = "Ever ≥50% L. crispatus by week 5 by arm.", 
+    row_group_as_column = TRUE
+    ) |> 
   cols_width(
-    "name" ~ px(200),
+    "name" ~ px(150),
     everything() ~ px(120)
   ) |> 
   cols_label(
@@ -1052,4 +1331,7 @@ table_2_with_model_results |>
   )
   
 ```
+
+
+
 

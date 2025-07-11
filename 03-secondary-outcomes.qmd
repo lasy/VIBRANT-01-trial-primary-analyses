@@ -20,9 +20,12 @@ editor: source
 
 
 
+```{r}
+fig_title <- mae_title(mae)
+```
 
 
-### Kinetics of colonization
+### Kinetics of LBP colonization
 
 #### Total relative abundances of LBP strains
 
@@ -81,7 +84,7 @@ g_tot_prop_LBP_strains <-
   expand_limits(y = 0) +
   scale_color_manual(values = arm_colors) +
   guides(col = "none") +
-  ggtitle(mae_title(mae)) 
+  ggtitle(fig_title) 
 
 ```
 
@@ -91,6 +94,7 @@ g_tot_prop_LBP_strains <-
 g_tot_prop_LBP_strains
 
 ```
+
 
 
 ```{r}
@@ -128,28 +132,32 @@ get_longitudinal_proportions_of_participants_who_colonized <-
       )
   }
 
-plot_longitudinal_proportions_of_participants_who_colonized <- 
-  function(total_rel_ab_of_LBP, mae){
+```
+
+```{r}
+
+plot_longitudinal_proportions_of_participants_who_colonized <- function(total_rel_ab_of_LBP){
     
     get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP) |>
-      ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
+      ggplot() +
+      aes(x = study_week, y = prop_who_colonized_at, col = arm) +
+      facet_grid(site ~ .) +
       geom_ribbon(
         aes(ymin = CI_low, ymax = CI_high, fill = arm), 
         alpha = 0.1, color = NA
       ) +
       geom_line() +
-      geom_point() +
-      facet_grid(site ~ .) + 
+      geom_point() + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
         "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
         breaks = seq(0, 1, by = 0.2)
-      ) +
+      )  +
       expand_limits(y = 0) +
       scale_color_manual("Arm", values = arm_colors) +
-      scale_fill_manual("Arm", values = arm_colors) +
-      ggtitle(mae_title(mae)) 
+      scale_fill_manual("Arm", values = arm_colors) 
   }
+
 
 ```
 
@@ -157,11 +165,11 @@ plot_longitudinal_proportions_of_participants_who_colonized <-
 
 ```{r}
 
-g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP, mae)
-
-g_prop_colonized_by
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
+g_prop_colonized_by + ggtitle(fig_title) 
 
 ```
+
 
 
 
@@ -169,20 +177,21 @@ g_prop_colonized_by
 
 g_prop_colonized_by <- 
   plot_longitudinal_proportions_of_participants_who_colonized(
-    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH"))), 
-    mae
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
     )
-
-g_prop_colonized_by
+g_prop_colonized_by + ggtitle(fig_title) 
 
 ```
+
+
+
 
 
 
 ```{r}
 
 plot_longitudinal_proportions_of_participants_who_colonized_v2 <- 
-  function(total_rel_ab_of_LBP, mae){
+  function(total_rel_ab_of_LBP){
     
     get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP) |>
       ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
@@ -202,8 +211,7 @@ plot_longitudinal_proportions_of_participants_who_colonized_v2 <-
       ) +
       expand_limits(y = 0) +
       scale_color_manual("Arm", values = arm_colors) +
-      scale_fill_manual("Arm", values = arm_colors) +
-      ggtitle(mae_title(mae)) 
+      scale_fill_manual("Arm", values = arm_colors)
     
   }
 
@@ -212,12 +220,222 @@ plot_longitudinal_proportions_of_participants_who_colonized_v2 <-
 
 Alternative visualization:
 
+```{r}
+
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized_v2(total_rel_ab_of_LBP)
+g_prop_colonized_by +  ggtitle(fig_title) 
+
+```
+
 
 ```{r}
 
-g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized_v2(total_rel_ab_of_LBP, mae)
+g_prop_colonized_by <- 
+  plot_longitudinal_proportions_of_participants_who_colonized_v2(
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    )
 
-g_prop_colonized_by
+g_prop_colonized_by +  ggtitle(fig_title) 
+
+```
+
+
+
+### Kinetics of *L. crispatus* colonization
+
+#### Total relative abundances of *L. crispatus* 
+
+```{r}
+
+total_rel_ab_of_Lc <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(str_detect(species, "crispatus"), !poor_quality_mg_data) |> 
+  left_join(
+    mae |> colData() |> as_tibble(), 
+    by = join_by(uid)
+  ) |>
+  filter(randomized, mITT) |> 
+  group_by(.sample, uid) |>
+  summarize(
+    total_Lc_rel_ab = sum(rel_ab, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+total_rel_ab_of_Lc <- 
+  total_rel_ab_of_Lc |> 
+  dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid))
+
+
+# we add a pid_nb 
+total_rel_ab_of_Lc <- 
+  total_rel_ab_of_Lc |> 
+  left_join(
+    total_rel_ab_of_Lc |> 
+      select(pid, arm, site) |> 
+      distinct() |> 
+      group_by(arm, site) |> 
+      arrange(pid) |> 
+      mutate(pid_nb = row_number()) |> 
+      ungroup()
+  )
+
+  
+```
+
+
+```{r}
+
+g_tot_prop_Lc <- 
+  total_rel_ab_of_Lc |>
+  filter(visit_type == "Clinic", !is.na(arm), PIPV) |> 
+  ggplot(aes(x = study_week, y = total_Lc_rel_ab, col = arm)) +
+  geom_line(aes(group = pid), alpha = 0.5) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  facet_grid(site ~ arm) + 
+  scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
+  scale_y_continuous(
+    "Total relative abundances\nof L. crispatus", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  expand_limits(y = 0) +
+  scale_color_manual(values = arm_colors) +
+  guides(col = "none") +
+  ggtitle(mae_title(mae)) 
+
+```
+
+```{r}
+#| fig-width: 10
+
+g_tot_prop_Lc
+
+```
+
+
+```{r}
+#| fig-width: 10
+
+g_tot_prop_Lc +
+  geom_label(aes(label = pid_nb), size = 2) +
+  labs(
+    caption = "Participants are labeled by their enrollment order within each arm and site."
+  )
+
+```
+
+
+#### Proportions of participants who colonized with 50% *L. crispatus* in each arm and each visit
+
+
+```{r}
+
+get_longitudinal_proportions_of_participants_who_colonized <- 
+  function(total_rel_ab_of_Lc) {
+    total_rel_ab_of_Lc |> 
+      filter(!is.na(arm), PIPV) |> 
+      group_by(site, arm, study_week) |>
+      summarize(
+        prop_who_colonized_at = mean(total_Lc_rel_ab > 0.5), 
+        CI_low = 
+          prop.test(
+            x = sum(total_Lc_rel_ab > 0.5), n = n(), 
+            conf.level = 0.95)$conf.int[1],
+        CI_high = 
+          prop.test(
+            x = sum(total_Lc_rel_ab > 0.5), n = n(), 
+            conf.level = 0.95)$conf.int[2],
+        .groups = "drop"
+      )
+  }
+
+```
+
+```{r}
+
+plot_longitudinal_proportions_of_participants_who_colonized <- function(total_rel_ab_of_Lc){
+    
+    get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_Lc) |>
+      ggplot() +
+      aes(x = study_week, y = prop_who_colonized_at, col = arm) +
+      facet_grid(site ~ .) +
+      geom_ribbon(
+        aes(ymin = CI_low, ymax = CI_high, fill = arm), 
+        alpha = 0.1, color = NA
+      ) +
+      geom_line() +
+      geom_point() + 
+      scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
+      scale_y_continuous(
+        "Proportion of participants\n≥ 50% L. crispatus", labels = scales::percent,
+        breaks = seq(0, 1, by = 0.2)
+      )  +
+      expand_limits(y = 0) +
+      scale_color_manual("Arm", values = arm_colors) +
+      scale_fill_manual("Arm", values = arm_colors) 
+  }
+
+
+```
+
+
+```{r}
+
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_Lc)
+g_prop_colonized_by + ggtitle(fig_title)
+
+```
+
+```{r}
+
+g_prop_colonized_by <- 
+  plot_longitudinal_proportions_of_participants_who_colonized(
+    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    )
+
+g_prop_colonized_by + ggtitle(fig_title)
+
+```
+
+
+Alternative visualization:
+
+
+
+```{r}
+
+plot_longitudinal_proportions_of_participants_who_colonized_v2 <- 
+  function(total_rel_ab_of_Lc){
+    
+    get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_Lc) |>
+      ggplot(aes(x = study_week, y = prop_who_colonized_at, col = arm)) +
+      geom_linerange(
+        aes(ymin = CI_low, ymax = CI_high, col = arm), 
+        alpha = 0.4, lineend = "round", linewidth = 1,
+        position = position_dodge(width = 0.5)
+      ) +
+      geom_line(position = position_dodge(width = 0.5), linewidth = 0.8) +
+      geom_point(aes(shape = arm), position = position_dodge(width = 0.5), size = 2) +
+      facet_grid(site ~ .) + 
+      scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) +
+      scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
+      scale_y_continuous(
+        "Proportion of participants\n≥ 50% L. crispatus", labels = scales::percent,
+        breaks = seq(0, 1, by = 0.2)
+      ) +
+      expand_limits(y = 0) +
+      scale_color_manual("Arm", values = arm_colors) +
+      scale_fill_manual("Arm", values = arm_colors)
+    
+  }
+
+```
+
+
+```{r}
+
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized_v2(total_rel_ab_of_Lc)
+g_prop_colonized_by + ggtitle(fig_title)
 
 ```
 
@@ -227,28 +445,26 @@ g_prop_colonized_by
 
 g_prop_colonized_by <- 
   plot_longitudinal_proportions_of_participants_who_colonized_v2(
-    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH"))), 
-    mae
+    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
     )
 
-g_prop_colonized_by
+g_prop_colonized_by + ggtitle(fig_title)
 
 ```
 
 
-#### Figure 2
 
-```{r}
-#| fig-width: 15
-#| fig-height: 6
 
- (g_prop_colonized_by + ggtitle("")) +
-  (g_tot_prop_LBP_strains + ggtitle("")) +
-  plot_layout(guides = "collect", widths = c(1, 2)) +
-  plot_annotation(tag_level = "a") &
-  theme(legend.position = "bottom")
 
-```
+### Durability of colonization
+
+
+> TODO: add/do figure 3D (include CIs)
+
+= proportion of participants who colonized by week 5 that still have colonization by week 12.
+
+
+
 
 ### Microbiota trajectories
 
@@ -399,21 +615,26 @@ LBP_strains <-
 #| fig-width: 8
 
 LBP_strains |> 
+   mutate(
+    visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric()),
+    ) |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
-  aes(x = .feature, y = rel_ab, col = site) +
+  aes(x = .feature, y = rel_ab, col = site, fill = site) +
   # geom_point(alpha = 0.5, size = 0.5, position = position_dodge(width = 0.5)) +
+  # geom_violin(col = NA, alpha = 0.4) + # > TODO: check if it looks good - IT DOES NOT!
   ggbeeswarm::geom_quasirandom(alpha = 0.5, size = 0.5, dodge.width = 0.5) +
   # geom_boxplot(outlier.size = 0.5) +
-  facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   xlab("LBP strain") +
   scale_y_continuous(
-    "Relative abundance bacteria", labels = scales::percent,
+    "Relative abundance", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
-  scale_color_manual(values = site_colors) +
+  scale_color_manual("Study\nsite", values = site_colors) +
+  scale_fill_manual("Study\nsite", values = site_colors) +
   theme(
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    axis.text.x = element_text(angle = 45, hjust = 1)
   ) 
 
 
@@ -464,7 +685,7 @@ LBP_strains |>
 ```
 
 
-## Proportion colonized among exposed
+### Proportion colonized among exposed
 
 ```{r}
 
@@ -580,7 +801,7 @@ tmp |>
 ```
 
 
-### Excluding immediate post-product visit
+#### Excluding immediate post-product visit
 
 ```{r}
 
@@ -702,11 +923,6 @@ tmp |>
 
 
 ```
-
-
-
-
-
 
 
 

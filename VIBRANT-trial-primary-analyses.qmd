@@ -11,7 +11,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: refresh # true refresh false
+  cache: true # true refresh false
   warning: false
 knitr:
   opts_chunk:
@@ -56,7 +56,7 @@ This document details the analyses and provides results for the primary analyses
 
 
 
-## Loading the data
+## Trial data
 
 The data used for these analyses are stored in an `R Bioconductor MultiAssayExperiment` object which contains the QCed and pre-processed data. The code and description of how raw data have been processed and QCed is available on the [`VIBRANT-0-QC-and-preprocessing` GitHub repository](https://github.com/lasy/VIBRANT-0-QC-and-preprocessing) (Still private at the moment, but will be made public upon publication, and anyone wishing to have access can email [Laura Symul](mailto:laura.symul@uclouvain.be)). 
 
@@ -78,7 +78,7 @@ rm(mae_file)
 ```
 
 
-## Demographics (Table 1)
+## Demographics (Table 1 & suppl. tables by sites)
 
 ```{r 01-dem, child = '01-Demographics.qmd'}
 #| eval: true
@@ -90,11 +90,60 @@ rm(mae_file)
 #| eval: true
 ```
 
+
 ## Secondary outcomes (Figures 2-4)
 
 ```{r 03-secondary, child = '03-secondary-outcomes.qmd'}
 #| eval: true
 ```
+
+
+
+## Supplementary analyses
+
+> TODO
+
+### Applicator staining
+
+
+#### Numbers
+
+- Proportion of participants that returned applicators
+- Proportion of participants with returned applicators for which the staining analysis was done
+
+#### Staining analysis 
+
+##### mITT 
+
+Concordance between self-reports and applicator staining:
+
+- scatter plot of # of self-reported doses vs # of positive staining
+
+- Number of participants that self-reported using at least one dose (= XX)
+- Number of participants that had at least one positive staining (= YY)
+
++ contingency table of self-reported doses and positive staining
+
+- Proportion of participants self-reported using at least one dose **and** have at least one positive staining  (= ZZ/XX)
+
+
+
+##### PP
+
+Same but with at least 6 doses
+
+
+### Time since last dose in 7-days active arms (LC-106-7, LC-115)
+
+We compute this time based on self-reported time of last study product use (daily - CRF plate 32/33) 
+-> date/time of last study product = use the crf 32/33 `visit_day` + answer to when? (early morning, etc.)
+-> swab time = use `study_day` of the weekly visit.
+
+
+### LBP colonization in participants with BV post-MTZ
+
+see "After oral metronidazole treatment, 22/70 (30%) people still had a Nugent score of 7 or higher, indicating a failure to resolve BV. Among the 16 of these people exposed to LBP, ZZ had a detectable LBP strain identified after treatment by metagenomics, and TT by qPCR during treatment." 
+
 
 
 
