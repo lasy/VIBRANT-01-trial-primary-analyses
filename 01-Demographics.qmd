@@ -157,6 +157,7 @@ table1_data <-
 ```
 :::callout-warning
 @Laura Vermeren: I changed the summary statistics from mean to median for the continuous variables (for number of past sexual partner, the mean was artificially high in the arm with the 90 partner MGH participant). Would you be able to check that the tests selected by the `gt_summary` package are appropriate for the data we have? They should be, but I'd love if we could double-check :)
+>LV : I check and I think it is good :)  
 :::
 
 

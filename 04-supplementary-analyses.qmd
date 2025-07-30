@@ -1,0 +1,955 @@
+---
+title: "Suplementary analyses"
+author: Laura Symul, Laura Vermeren, Susan Holmes
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+
+### Long terme colonization 
+
+"Among people with detection of the LBP strains during the first 5 weeks, approximately 40-60% still had detection at week 12 (Figure 3b), demonstrating prolonged durability despite a relatively short initial dosing."
+
+Among participants colonized by week 5, how many are still colonized at week 12?
+
+```{r}
+
+# existe déjà 
+
+col_by_week5 <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
+  ) |> 
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
+
+
+col_at_week12 <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "2120", .feature == "colonized_LBP_at_mg")
+  ) |> 
+  mutate(LBP_colonization_at_week12 = outcome |> replace_na(FALSE)) 
+
+
+col_still_col <- 
+  col_by_week5 |> 
+  select(pid, site, arm, randomized, ITT, mITT, PP, LBP_colonization_by_week5) |> 
+  left_join(
+    col_at_week12 |> select(pid, LBP_colonization_at_week12 ),
+    by = c("pid")
+  )
+
+```
+
+
+Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
+
+```{r}
+
+summary_table_still_col <-
+  col_still_col |> 
+  filter(LBP_colonization_by_week5) |>
+  group_by(site, arm) |> 
+  summarize(
+    n = n(),  # total with colonization at week 5
+    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+table_still_col <- 
+  summary_table_still_col |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+
+table_still_col |> 
+  group_by(site) |> 
+  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm and site", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    # Blinded = "All blinded arms",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+
+```
+
+Overall colonization at week 12 among participants colonized by week 5
+
+```{r}
+
+col_still_col |> 
+  filter(LBP_colonization_by_week5) |> 
+  summarise(
+    n = n(),
+    n_success = sum(LBP_colonization_at_week12),
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  ) |> 
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(n, n_success, pct, CI_text) |> 
+  gt() |> 
+  cols_label(
+    n = "N participants \n colonized by week 5",
+    n_success = "n (%) participants still colonized at week 12",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+
+```
+
+
+### Applicator staining
+
+#### Load data
+
+We load data on stained applicators from CRF46 and data on returned applicators from CRF23. We also load the exposures table to obtain information on study product use. Then, we create the `applicator` table, which includes only participants from the mITT population.
+
+```{r}
+
+applicator_stained <- 
+  metadata(mae)$crf_data_clean$crf46 |> 
+  as_tibble() |> 
+  select(-dfseq, -vdate_fixed)
+
+applicator_returned <- 
+  metadata(mae)$crf_data_clean$crf23 |> 
+  as_tibble() |> 
+  select(uid, pid, visit_code, study_day, used_applicators, number_applicators) |> 
+  group_by(pid)
+
+study_product <- 
+  mae@colData |> 
+  as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    exposures,  
+    by = "pid"
+  ) |>
+  group_by(pid) |>
+  summarise(
+    n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE)
+  )
+
+applicator <-
+  mae@colData |> as_tibble() |>
+  select(pid, site, randomized, arm, ITT, mITT, PP) |>
+  distinct() |>
+  filter(randomized, mITT)|>
+  left_join(applicator_returned, by = c("pid")) |>
+  left_join(
+    applicator_stained,
+    by = c("uid", "pid", "visit_code", "study_day")
+  ) |>
+  left_join(study_product, by = "pid")
+
+```
+
+Some participants returned applicators at two different visits. According to the CAPRISA Vulindlela Pharmacy, used and remaining applicators, along with the study product, were given back to participants after the first visit, and they were expected to return all applicators at the second visit. For this reason, when applicators were returned at both visits, we kept only the data from the second visit.
+
+Two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
+
+*   Participant 068-20-0425 reported taking the spare applicator out of its wrapping and placing it in the return bag without using or washing any applicators.
+*   Participant 068-20-0439 reported inserting the spare applicator on the day of the visit, thinking all applicators had to be used, but also did not wash any of them.
+
+
+```{r}
+#| fig-height: 6
+#| fig-width: 8
+
+applicator |> 
+  ggplot(aes(x = visit_code, y = pid, fill = number_applicators |> as.factor())) +
+  geom_tile() + 
+  geom_text(aes(label = applicator_stain_positive), color = "black", size = 2) +   
+  scale_fill_manual( 
+    name = "Number of applicators \nreturned",
+    values = c(
+    "3" = "lightblue3", 
+    "4" = "lightblue", 
+    "5" = "lightblue1", 
+    "6" = "lightgreen", 
+    "7" = "green3", 
+    "8" = "darkgreen"
+    ), 
+    na.translate = FALSE) +
+  labs(
+    x = "Visit code",
+    y = "Participant ID",
+    title = "Number of applicator returned (out of number applicator stained positive)") + 
+  theme(axis.text.y = element_text(size=4))
+```
+
+
+```{r}
+applicator <- 
+  applicator |>
+  group_by(pid) |>
+  mutate(
+    data_complete = !is.na(number_applicators) | !is.na(applicator_stain_positive)
+  ) |>
+  arrange(pid, desc(data_complete), desc(visit_code)) |>
+  dplyr::slice(1) |> 
+  ungroup()
+```
+
+
+
+#### Numbers
+
+>Done for mITT, is it ok ?
+
+- Proportion of participants that returned applicators (0.933)
+- Proportion of participants with returned applicators for which the staining analysis was done (0.988)
+
+```{r}
+
+applicator |> 
+  group_by(pid) |> 
+  summarise(
+    used_applicators_returned = ifelse(any(used_applicators == "Yes", na.rm = TRUE), "Yes", "No"),
+    applicator_stained = ifelse(any(!is.na(total_applicators_stained)), "Yes", "No"),
+    .groups = "drop"
+  )|> 
+  dplyr::count(used_applicators_returned, applicator_stained) |> 
+  mutate(
+    prop = round(n / sum(n), 3)
+  ) |> 
+  gt() |> 
+  cols_label(
+    used_applicators_returned = "Used applicators returned",
+    applicator_stained = "Applicator stained",
+    n = "N participants",
+    prop = "Percentage"
+  )
+  
+```
+
+```{r}
+applicator |> 
+  dplyr::count(used_applicators) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt()
+```
+
+
+```{r}
+applicator |> 
+  filter(used_applicators == "Yes") |> 
+  dplyr::count(total_applicators_stained == 0|is.na(total_applicators_stained)) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt()
+  
+```
+
+
+
+#### Staining analysis 
+
+##### mITT 
+
+Concordance between self-reports and applicator staining:
+
+- scatter plot of # of self-reported doses vs # of positive staining
+
+```{r}
+
+applicator |> 
+  mutate(
+    applicator_stain_positive = 
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
+  ) |>
+  dplyr::count(n_product_doses, applicator_stain_positive) |>
+  ggplot(aes(x=n_product_doses , 
+             y=applicator_stain_positive, 
+             fill = n)) + 
+  geom_tile() +
+  geom_text(aes(label = n), size = 3) +
+  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
+  guides(fill = "none") +
+  xlab("Number of doses taken") +
+  ylab("Positive applicator (n)")
+```
+
+```{r}
+
+applicator |> 
+  mutate(
+    applicator_stain_positive = 
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
+  ) |>
+  ggplot(aes(x = n_product_doses, y = applicator_stain_positive, col = n_product_doses |> as.factor())) + 
+  geom_point() + 
+  geom_jitter(width = 0.2, height = 0.2) + 
+  labs(x = "Number of study product doses", 
+       y = "Number of applicator stained positive") + 
+  guides(col = "none")
+```
+
+
+- Number of participants that self-reported using at least one dose (= XX) (90)
+- Number of participants that had at least one positive staining (= YY) (82)
+
+```{r}
+applicator |> 
+  dplyr::count(n_product_doses) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    n_product_doses = "Number of study product doses taken"
+  )
+```
+
+
+```{r}
+applicator |> 
+  dplyr::count(applicator_stain_positive > 1) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `applicator_stain_positive > 1` = "More than 1 applicator stained positive"
+  )
+```
+
+
++ contingency table of self-reported doses and positive staining (ok)
+
+- Proportion of participants self-reported using at least one dose **and** have at least one positive staining  (= ZZ/XX) (=82)
+
+```{r}
+applicator |> 
+  dplyr::count((applicator_stain_positive > 1&n_product_doses>1)) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `(applicator_stain_positive > 1 & n_product_doses > 1)` = "More than 1 applicator stained positive and more than 1 product doses taken"
+  )
+```
+
+
+##### PP
+
+-> est ce que je dois filtrer PP avant ? Les resultats ne sont pas les mêmes
+
+Same but with at least 6 doses
+
+Concordance between self-reports and applicator staining:
+
+- scatter plot of # of self-reported doses vs # of positive staining
+
+```{r}
+
+
+applicator |> 
+filter(PP) |> 
+  mutate(
+    applicator_stain_positive = 
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing"),
+    n_product_doses = n_product_doses |> as.factor()
+  ) |>
+  dplyr::count(n_product_doses, applicator_stain_positive) |>
+  ggplot(aes(x=n_product_doses , 
+             y=applicator_stain_positive, 
+             fill = n)) + 
+  geom_tile() +
+  geom_text(aes(label = n), size = 3) +
+  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
+  guides(fill = "none") +
+  xlab("Number of doses taken") +
+  ylab("Positive applicator (n)")
+```
+```{r}
+
+
+applicator |>
+  filter(PP) |>
+  mutate(
+    applicator_stain_positive =
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |>     replace_na("Missing")
+  ) |>
+  ggplot(
+    aes(
+      x = n_product_doses |> as.factor(),
+      y = applicator_stain_positive,
+      col = n_product_doses |> as.factor()
+  )
+  ) +
+  geom_point() +
+  geom_jitter(width = 0.2, height = 0.2) + 
+  labs(x = "Number of study product doses", 
+       y = "Number of applicator stained positive") + 
+  guides(col = "none")
+
+
+```
+
+- Number of participants that self-reported using at least six dose (= XX) (85)
+- Number of participants that had at least six positive staining (= YY) (61)
+
+```{r}
+applicator |> 
+  filter(PP) |> 
+  dplyr::count(n_product_doses) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    n_product_doses = "Number of study product taken"
+  )
+```
+
+
+```{r}
+applicator |> 
+  filter(PP) |> 
+  dplyr::count(applicator_stain_positive > 6) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `applicator_stain_positive > 6` = "More than 6 applicator stained positive"
+  )
+```
+
+
++ contingency table of self-reported doses and positive staining (ok)
+
+- Proportion of participants self-reported using at least six dose **and** have at least six positive staining  (= ZZ/XX) (=59)
+
+```{r}
+applicator |>
+  filter(PP) |> 
+  dplyr::count((applicator_stain_positive > 6&n_product_doses>6)) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() 
+```
+
+### Time since last dose in 7-days active arms (LC-106-7, LC-115)
+
+We compute this time based on self-reported time of last study product use (daily - CRF plate 32/33) 
+-> date/time of last study product = use the crf 32/33 `visit_day` + answer to when? (early morning, etc.)
+-> swab time = use `study_day` of the weekly visit.
+
+
+To compute the time between the last dose taken prior to the in-person visit at week 2, we use information from three sources: crf32 for the time of insertion of the study product, the exposure table for the date of the last dose, and the visits_crfs_merged table for the study day of the week 2 in-person visit.
+
+To better estimate this time interval, we combine the `study_day` (which reflects the calendar day of product use) with `insertion_study_product_time` to account for the time of day the product was inserted. Specifically, we convert the reported insertion window into a fractional day value and add it to the study day, as follows:
+
+*   Before 6am: 0.125
+*   Early morning (6–9am): 0.25
+*   Late morning (9–12pm): 0.4375
+*   Early afternoon (12–3pm): 0.5625
+*   Late afternoon (3–6pm): 0.6875
+*   Evening (6–9pm): 0.8125
+*   Late evening (9pm–midnight): 0.9375
+
+For the week 2 in-person visit, we also assume it occurred during the day (rather than at midnight), so we add 0.5 to the visit's study_day to reflect a likely early afternoon visit time.
+
+```{r}
+#| eval: true
+
+study_product <-
+  mae@colData |>
+  as_tibble() |>
+  select(pid, site, randomized, arm, ITT, mITT, PP) |>
+  distinct() |>
+  filter(randomized, mITT) |>
+  left_join(
+    exposures |> select(pid, visit_code, study_product),
+  by = "pid"
+  ) |>
+  left_join(
+    metadata(mae)$crf_data_clean$crf32 |>as_tibble(),
+    by = (c("pid", "visit_code"))) |>
+  dplyr::rename(
+    study_day_product = study_day,
+    visit_code_product = visit_code
+  ) |>
+  mutate(study_day_product_frac =
+           dplyr::case_when(
+             insert_study_product_time == "Before 6am" ~ study_day_product + 0.125,
+             insert_study_product_time == "Early morning (6am-9am)" ~ study_day_product + 0.3125,
+             insert_study_product_time == "Late morning (9am-12pm)" ~ study_day_product + 0.4375,
+             insert_study_product_time == "Early afternoon (12pm-3pm)" ~ study_day_product + 0.5625,
+             insert_study_product_time == "Late afternoon (3pm-6pm)" ~ study_day_product + 0.6875,
+             insert_study_product_time == "Evening (6pm-9pm)" ~ study_day_product + 0.8125,
+             insert_study_product_time == "Late evening (9pm-midnight)" ~ study_day_product + 0.9375,
+             TRUE ~ study_day_product
+           ))
+
+
+# study_day visit 2 in person
+# ! pid 068100026 appear 2 times ! -> remove using filter(!is.na(study_day_visit2))
+visit2_studyday <- 
+  metadata(mae)$visits_crfs_merged |> 
+  as_tibble() |> 
+  select(pid, visit_code, study_day) |> 
+  distinct() |> 
+  filter(visit_code == "1200") |> 
+  dplyr::rename(
+    study_day_v2 = study_day
+  ) |> 
+  dplyr::filter(!is.na(study_day_v2)) |> 
+  mutate(
+    study_day_v2 = study_day_v2 + 0.5
+  )
+
+study_prod_time <- 
+  study_product |> 
+  left_join(visit2_studyday |> select(-visit_code), by = "pid") |> 
+  group_by(pid) |> 
+  filter(study_product =="1") |> 
+  filter(study_day_product_frac <= study_day_v2) |> 
+  arrange(study_day_product_frac) |> 
+  slice_tail(n = 1) |>              
+  ungroup() 
+
+
+# filter for participant in LC-106-7 and LC-115 and compute the difference in time
+study_prod_time <- 
+  study_prod_time |> 
+  filter(arm %in% c("LC-106-7", "LC-115")) |> 
+  mutate(
+    time_between_final_dose_and_v2 = study_day_v2 - study_day_product_frac
+  )
+
+```
+
+
+
+```{r}
+#| eval: true
+
+# mean and CI of time_between_final_dose_and_visit2 by arm
+study_prod_time |> 
+  group_by(arm) |> 
+  summarise(
+    mean_time = mean(time_between_final_dose_and_v2, na.rm = TRUE),
+    median_time = median(time_between_final_dose_and_v2, na.rm = TRUE),
+    sd_time = sd(time_between_final_dose_and_v2, na.rm = TRUE),
+    n = n(),
+    CI = list(DescTools::MeanCI(time_between_final_dose_and_v2, conf.level = 0.95, na.rm = TRUE))
+  ) |> 
+  mutate(
+    CI_text = str_c("(", round(map_dbl(CI, ~ .x[2]), 2), "-", round(map_dbl(CI, ~ .x[3]), 2), ")")
+  ) |>
+  select(arm,n, median_time, mean_time, sd_time, CI_text)
+
+```
+
+```{r}
+#| fig-height: 6
+#| fig-width: 8
+
+study_prod_time |> 
+  ggplot() + 
+  aes(x = time_between_final_dose_and_v2*24, y = pid) +
+  geom_point() + 
+  geom_vline(xintercept = c(24, 48, 72, 96), linetype = "dashed", color = "steelblue") +
+  scale_x_continuous(
+    breaks = seq(0, 24*4, by = 12),  
+    name = "Time between final dose and visit 2 (hours)"
+  ) +
+  facet_grid(site~arm, scales = "free_y", space = "free_y")
+
+```
+
+### LBP colonization in participants with BV post-MTZ
+
+see "After oral metronidazole treatment, 22/70 (30%) people still had a Nugent score of 7 or higher, indicating a failure to resolve BV. Among the 16 of these people exposed to LBP, ZZ had a detectable LBP strain identified after treatment by metagenomics, and TT by qPCR during treatment." 
+
+The Nugent score is available in CRF14. We are interested in the Nugent score value at the visit following metronidazole treatment (visit 1100).
+
+We first create a table containing the Nugent score for all participants at all visits. We then create a variable `nugent_positive`, which is `TRUE` if `nugent_total_score >= 7` and `FALSE` otherwise. We also create a variable `active_arm` to group participant by active arm (i.e. LC106-o, LC-106-7, LC-106-3, LC-115) vs Placebo 
+
+```{r}
+# nugent score for all visits 
+nugent_score <- 
+  metadata(mae)$crf_data_clean$crf14 |> 
+  as_tibble() |> 
+  select(uid, pid, visit_code, study_day, nugent_total_score) |> 
+  left_join(
+    mae@colData |> as_tibble() |> 
+    select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+    distinct()) |>
+  filter(randomized, mITT) |> 
+  group_by(pid) |>
+  mutate(
+    active_arm = ifelse(arm!="Pl", TRUE, FALSE), 
+    nugent_positive = ifelse(nugent_total_score >= 7, TRUE, FALSE)
+  ) |> 
+  ungroup()
+
+```
+
+```{r}
+#| fig-height: 6
+#| fig-width: 8
+
+nugent_score |> 
+  filter(visit_code == "1100") |> 
+  ggplot()+ 
+  aes(x = nugent_total_score |> as.factor(), y = pid, fill = nugent_positive |> as.factor()) +
+  geom_tile() +
+  scale_fill_manual(
+    name = "Nugent score >= 7",
+    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
+    na.translate = FALSE
+  ) + 
+  labs(x = "Nugent score", y = "Participant ID", title = "Nugent score at visit 1100") + 
+  theme(axis.text.y = element_text(size = 4))
+  
+nugent_score |> 
+  ggplot()+ 
+  aes(x = visit_code, y = pid, fill = nugent_positive |> as.factor()) +
+  geom_tile() +
+  scale_fill_manual(
+    name = "Nugent score positive (>= 7)",
+    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
+    na.translate = FALSE
+  ) + 
+  labs(x = "Visit Code", y = "Participant ID") + 
+  theme(axis.text.y = element_text(size = 4))
+
+
+```
+
+At visit 1100, among participants with BV who were exposed to the LBP (i.e., in the active arm), 5 participants had a detectable LBP strain identified after treatment by metagenomics.
+ 
+
+```{r}
+
+# among the 12 of these people exposed to LBP
+
+nugent_score |>
+  filter(visit_code == "1100") |> 
+  filter(active_arm) |>
+  filter(nugent_positive) |>
+  left_join(
+    mae[["mg"]] |> as_tibble() |>  # add mg data
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |>
+      filter(visit_code == "1200"),
+    by = c("pid")
+  ) |>
+  filter(!is.na(LBP)) |> #only LBP strain
+  group_by(pid) |>
+  summarise(prop_tot_LBP = sum(rel_ab)) |>
+  arrange(prop_tot_LBP |> desc())
+  #filter(prop_tot_LBP > 0) 
+  
+```
+```{r}
+
+#nugent score of active arm at visit 1100 
+nugent_score |> 
+  filter(visit_code == "1100") |> 
+  group_by(arm) |>
+  summarise(
+    n = n(),
+    n_positive = sum(nugent_positive, na.rm = TRUE),
+    p = n_positive / n,
+    CI = binom::binom.confint(n_positive, n, method = "exact")
+  ) |>
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(-CI, -p) |> 
+  gt() |> 
+  tab_header(
+    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 1100 (week1)"
+  ) |>
+  cols_label(
+    n = "N participants",
+    n_positive = "n (%) participants with nugent score >= 7",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+
+```
+
+See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY vs. YY/YY who did not colonize (p = YY).*"
+
+```{r}
+
+nugent_score |> 
+  filter(visit_code == "1500") |> 
+  group_by(active_arm) |> 
+  summarise(
+    n = n(),
+    n_positive = sum(nugent_positive, na.rm = TRUE),
+    p = n_positive / n,
+    CI = binom::binom.confint(n_positive, n, method = "exact")
+  ) |>
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(-CI, -p) |> 
+  gt() |> 
+  tab_header(
+    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 1500 (week 5)"
+  ) |> 
+  cols_label(
+    n = "N participants",
+    n_positive = "n (%) participants with nugent score >= 7",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+  
+  nugent_score |> 
+  filter(visit_code == "2120") |> 
+  group_by(active_arm) |> 
+  summarise(
+    n = n(),
+    n_positive = sum(nugent_positive, na.rm = TRUE),
+    p = n_positive / n,
+    CI = binom::binom.confint(n_positive, n, method = "exact")
+  ) |>
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(-CI, -p) |> 
+  gt() |> 
+  tab_header(
+    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 2120 (week12)"
+  ) |> 
+  cols_label(
+    n = "N participants",
+    n_positive = "n (%) participants with nugent score >= 7",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+  
+  
+  
+```
+
+Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY vs. YY/YY who did not colonize (p = YY).
+
+```{r}
+
+nugent_score |> 
+  filter(visit_code == "2120") |> 
+  left_join(col_by_week5 |> select(pid, LBP_colonization_by_week5), by="pid") |> 
+  group_by(LBP_colonization_by_week5) |> 
+  summarise(
+    n = n(),
+    n_positive = sum(nugent_positive, na.rm = TRUE),
+    p = n_positive / n,
+    CI = binom::binom.confint(n_positive, n, method = "exact")
+  ) |>
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(-CI, -p) |> 
+  gt() |> 
+  tab_header(
+    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 2120 (week12)"
+  ) |> 
+  cols_label(
+    n = "N participants",
+    n_positive = "n (%) participants with nugent score >= 7",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+    
+```
+
+
+### LBP Colonization dominance
+
+See *When the LBP isolates were detected they were most often the dominant species in the community*
+
+Qu'est ce qu'on entend par détecté ? Metagenomics ou qPCR ? A un niveau de 5% ? 
+Primary outcome ? 
+
+```{r}
+
+rel_abs <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  filter(!poor_quality_mg_data) |> 
+  left_join(
+    mae |> colData() |> as_tibble(), 
+    by = join_by(uid)
+  ) |>
+  filter(randomized, mITT)
+
+rel_abs |> 
+  group_by(.sample) |> 
+  summarise(
+    detected = any(!is.na(LBP) & rel_ab > 0, na.rm = TRUE),
+    crispatus_abundance = sum(rel_ab[species == "crispatus"], na.rm = TRUE), 
+    crispatus_dominance = ifelse(crispatus_abundance>0.5, TRUE, FALSE), 
+    .groups = "drop"
+  ) |> 
+  filter(detected) |> 
+  dplyr::count(crispatus_dominance, name = "n") |> 
+  mutate(
+    crispatus_dominance = if_else(crispatus_dominance, "Yes", "No"),
+    total = sum(n),
+    pct = round(100 * n / total, 1),
+    CI = binom::binom.confint(n, total, method = "exact"),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(crispatus_dominance, n, pct, CI_text) |> 
+  gt() |> 
+  tab_header(
+    title = md("Dominance of *L. crispatus* when LBP strains are detected")
+  ) |> 
+  cols_label(
+    crispatus_dominance = "L. crispatus dominance",
+    n = "N samples with LBP detected",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+
+```
+
+See *Additionally, if a participant established L. crispatus dominance with the LBP strains, they had a significantly lower chance of recurrent BV *
+
+At any time ? 
+
+```{r}
+#| fig-height: 6
+#| fig-width: 8
+
+tmp <- 
+  rel_abs |> 
+  group_by(.sample) |> 
+  summarise(
+    detected = any(!is.na(LBP) & rel_ab > 0, na.rm = TRUE),
+    crispatus_abundance = sum(rel_ab[species == "crispatus"], na.rm = TRUE), 
+    LBP_abundance = sum(rel_ab[!is.na(LBP)], na.rm = TRUE),
+    LBP_dominance = ifelse(LBP_abundance>0.5, TRUE, FALSE), 
+    crispatus_dominance = ifelse(crispatus_abundance>0.5, TRUE, FALSE), 
+    .groups = "drop"
+  ) |> 
+  left_join(nugent_score |> 
+              select(uid, pid, visit_code, nugent_total_score, nugent_positive), 
+            by = c(".sample"="uid")) 
+
+tmp |>  
+  filter(!is.na(visit_code)) |> 
+  ggplot() + 
+  aes(x=visit_code, y = pid, 
+      shape = nugent_positive |> as.character(), 
+      col = LBP_dominance |> as.character()) + 
+  geom_point() + 
+  scale_shape_manual(
+    name = "Nugent Postive", 
+    values = c("TRUE" = 16, "FALSE" = 1)
+  ) + 
+  scale_color_manual(
+    name = "LPB Dominance", 
+    values = c("TRUE" = "green3", "FALSE" = "orchid2" )
+  ) + 
+  labs(x = "Visit code", y = "Pid") + 
+  theme(axis.text.y = element_text(size = 4))
+  
+```
+
+```{r}
+tmp |> 
+  filter(!is.na(LBP_dominance), !is.na(nugent_positive)) |> 
+  filter(visit_code == "1500") |> 
+  dplyr::count(LBP_dominance, nugent_positive) |> 
+  group_by(LBP_dominance) |> 
+  mutate(
+    pct = round(100 * n / sum(n), 1)
+  ) |> 
+  ungroup() |> 
+  gt()
+```
+
+### LBP detectable at week 12
+
+See "*However, an ideal product would durably colonize the majority of people, and given that LBP strains were detectable in only 34% of active arm participants at 12 weeks this product still needs optimization*"
+
+```{r}
+rel_abs |> 
+  filter(visit_code == "2120") |> 
+  group_by(.sample) |> 
+  summarise(detected = any(!is.na(LBP) & rel_ab > 0, na.rm = TRUE)) |> 
+  ungroup() |> 
+  dplyr::count(detected) |>
+  mutate(
+    pct = round(100 * n / sum(n), 1)
+  ) |> 
+  gt()
+  
+```
+
+

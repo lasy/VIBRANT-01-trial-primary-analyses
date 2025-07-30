@@ -68,7 +68,9 @@ rm(mae_file)
 
 ```
 
-## Colonized and still colonized 
+## ✅ Colonized and still colonized 
+
+*Among people with detection of the LBP strains during the first 5 weeks, approximately 40-60% still had detection at week 12 (Figure 3b), demonstrating prolonged durability despite a relatively short initial dosing.* 
 
 Among participants colonized by week 5, how many are still colonized at week 12?
 
@@ -211,41 +213,9 @@ col_still_col |>
 ```
 
 
-purgatoire
-
-```{r}
-# brouillon 
-# problème est que tous les pid sont dupliqué 
-# donc on rajoute le summary et on a le même résultat que précédement
-# test <- 
-#   mae@colData |> as_tibble() |> 
-#   select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-#   distinct() |> 
-#   filter(randomized, mITT) |> 
-#   left_join(
-#     mae[["col_LBP_mg"]] |> 
-#       as_tibble() |> 
-#       dplyr::left_join(
-#         mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-#         by = join_by(.sample == uid)
-#       ) |> 
-#       dplyr::filter(visit_code %in% c("1500","2120"))
-#   )  |> 
-#   mutate(
-#     LBP_colonization_by_week5 = ifelse(visit_code == "1500" & .feature == "colonized_LBP_by_mg", outcome, FALSE),
-#     LBP_colonization_at_week12 = ifelse(visit_code == "2120" & .feature == "colonized_LBP_at_mg", outcome, FALSE)
-#   ) |> 
-#   group_by(pid) |>
-#   summarise(
-#     col_by_week5 = any(LBP_colonization_by_week5, na.rm = TRUE),
-#     col_by_week12 = any(LBP_colonization_at_week12, na.rm = TRUE),
-#     .groups = "drop"
-#   )
-
-```
 
 
-## Applicator staining
+## ✅ Applicator staining
 
 ### Data
 
@@ -292,9 +262,6 @@ applicator <-
     by = c("uid", "pid", "visit_code", "study_day")
   ) |> 
   left_join(exposure, by = "pid")
-
-
-
 
 ```
 
@@ -469,6 +436,7 @@ applicator |>
   dplyr::count(used_applicators_returned, applicator_stained)
   
 
+
 ```
 
 
@@ -516,7 +484,7 @@ applicator |>
 ```
 
 
-## Time between final doses and week 2 visit
+## ✅ Time between final doses and week 2 visit
 
 To compute the time between the last dose taken prior to the in-person visit at week 2, we use information from three sources: crf32 for the time of insertion of the study product, the exposure table for the date of the last dose, and the visits_crfs_merged table for the study day of the week 2 in-person visit.
 
@@ -641,7 +609,7 @@ study_prod_time |>
 
 
 ## Sensitive analyses 
-At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance., 
+At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance.
 
 ```{r}
 
@@ -671,7 +639,7 @@ propLBP_week3_5 |>
 ```
 
 
-## Nugent score 
+## ✅ Nugent score : LBP colonization in participants with BV post-MTZ
 
 The nugent score can be found in crf14. We are interested in the value of the nugent score at the visit after metroidazole treatment (visit 1100).
 
@@ -754,19 +722,60 @@ nugent_score |>
   summarise(prop_tot_LBP = sum(rel_ab)) |>
   filter(prop_tot_LBP > 0) 
   
-
-
-  
 ```
+
+
+## Results
+
+Across all active arms combined, YY participants achieved detection of a single LBP strain by metagenomic sequencing at least once in the first 5 weeks. Approximately 40-60% of participants that had detected LBP strains at 5 weeks, still had detection at 12 weeks demonstrating prolonged colonization after a short initial treatment course. 
+
+> "a single LBP" est strict (une seule souche détectée et pas deux") ou c'est une façon de dire au moins une souche ? 
+
 
 
 ## Purgatory 
 
-**Time between final doses and week 2 visit**
----
-Avant : on prenait la date de la dernière dose prise puis on regardait la différence entre la date de ma visite et cette date (pouvait être positif et négatif)
-Après : on prend la date de la dernière dose prise *avant la visite week2* et on regarde la différence entre la date de ma visite et cette date (ne peut plus être positif
----
+### Long term colonization 
+
+purgatoire
+
+```{r}
+# brouillon 
+# problème est que tous les pid sont dupliqué 
+# donc on rajoute le summary et on a le même résultat que précédement
+# test <- 
+#   mae@colData |> as_tibble() |> 
+#   select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+#   distinct() |> 
+#   filter(randomized, mITT) |> 
+#   left_join(
+#     mae[["col_LBP_mg"]] |> 
+#       as_tibble() |> 
+#       dplyr::left_join(
+#         mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+#         by = join_by(.sample == uid)
+#       ) |> 
+#       dplyr::filter(visit_code %in% c("1500","2120"))
+#   )  |> 
+#   mutate(
+#     LBP_colonization_by_week5 = ifelse(visit_code == "1500" & .feature == "colonized_LBP_by_mg", outcome, FALSE),
+#     LBP_colonization_at_week12 = ifelse(visit_code == "2120" & .feature == "colonized_LBP_at_mg", outcome, FALSE)
+#   ) |> 
+#   group_by(pid) |>
+#   summarise(
+#     col_by_week5 = any(LBP_colonization_by_week5, na.rm = TRUE),
+#     col_by_week12 = any(LBP_colonization_at_week12, na.rm = TRUE),
+#     .groups = "drop"
+#   )
+
+```
+
+
+### Time between final doses and week 2 visit
+
+>Avant : on prenait la date de la dernière dose prise puis on regardait la différence entre la date de ma visite et cette date (pouvait être positif et négatif)
+>Après : on prend la date de la dernière dose prise *avant la visite week2* et on regarde la différence entre la date de ma visite et cette date (ne peut plus être positif
+
 
 We take the information from the last dose in the exposure table and add the insertion time from the crf32. 
 
