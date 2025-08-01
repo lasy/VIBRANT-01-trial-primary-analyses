@@ -138,6 +138,71 @@ table_still_col |>
 
 ```
 
+
+
+```{r}
+
+summary_table_still_col <-
+  col_still_col |> 
+  filter(LBP_colonization_by_week5) |>
+  group_by(arm) |> 
+  summarize(
+    n = n(),  # total with colonization at week 5
+    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+table_still_col <- 
+  summary_table_still_col |> 
+  mutate(
+    N_per_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    arm, N_per_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+
+table_still_col |> 
+  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    # Blinded = "All blinded arms",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+
+```
+
+
+
 Overall colonization at week 12 among participants colonized by week 5
 
 ```{r}
@@ -328,8 +393,8 @@ applicator |>
       applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
   ) |>
   dplyr::count(n_product_doses, applicator_stain_positive) |>
-  ggplot(aes(x=n_product_doses , 
-             y=applicator_stain_positive, 
+  ggplot(aes(x = n_product_doses , 
+             y = applicator_stain_positive, 
              fill = n)) + 
   geom_tile() +
   geom_text(aes(label = n), size = 3) +
@@ -337,6 +402,7 @@ applicator |>
   guides(fill = "none") +
   xlab("Number of doses taken") +
   ylab("Positive applicator (n)")
+
 ```
 
 ```{r}
@@ -531,17 +597,19 @@ study_product <-
     study_day_product = study_day,
     visit_code_product = visit_code
   ) |>
-  mutate(study_day_product_frac =
-           dplyr::case_when(
-             insert_study_product_time == "Before 6am" ~ study_day_product + 0.125,
-             insert_study_product_time == "Early morning (6am-9am)" ~ study_day_product + 0.3125,
-             insert_study_product_time == "Late morning (9am-12pm)" ~ study_day_product + 0.4375,
-             insert_study_product_time == "Early afternoon (12pm-3pm)" ~ study_day_product + 0.5625,
-             insert_study_product_time == "Late afternoon (3pm-6pm)" ~ study_day_product + 0.6875,
-             insert_study_product_time == "Evening (6pm-9pm)" ~ study_day_product + 0.8125,
-             insert_study_product_time == "Late evening (9pm-midnight)" ~ study_day_product + 0.9375,
-             TRUE ~ study_day_product
-           ))
+  mutate(
+    study_day_product_frac =
+      dplyr::case_when(
+        insert_study_product_time == "Before 6am" ~ study_day_product + 0.125,
+        insert_study_product_time == "Early morning (6am-9am)" ~ study_day_product + 0.3125,
+        insert_study_product_time == "Late morning (9am-12pm)" ~ study_day_product + 0.4375,
+        insert_study_product_time == "Early afternoon (12pm-3pm)" ~ study_day_product + 0.5625,
+        insert_study_product_time == "Late afternoon (3pm-6pm)" ~ study_day_product + 0.6875,
+        insert_study_product_time == "Evening (6pm-9pm)" ~ study_day_product + 0.8125,
+        insert_study_product_time == "Late evening (9pm-midnight)" ~ study_day_product + 0.9375,
+        TRUE ~ study_day_product
+           )
+    )
 
 
 # study_day visit 2 in person
@@ -557,7 +625,7 @@ visit2_studyday <-
   ) |> 
   dplyr::filter(!is.na(study_day_v2)) |> 
   mutate(
-    study_day_v2 = study_day_v2 + 0.5
+    study_day_v2 = study_day_v2 + 0.5 # this assumes that the visit happened at noon (We don't think we have data/information about the time of visit)
   )
 
 study_prod_time <- 
@@ -565,7 +633,7 @@ study_prod_time <-
   left_join(visit2_studyday |> select(-visit_code), by = "pid") |> 
   group_by(pid) |> 
   filter(study_product =="1") |> 
-  filter(study_day_product_frac <= study_day_v2) |> 
+  filter(study_day_product_frac <= study_day_v2) |>  # we only consider doses that were taken before the visit 2
   arrange(study_day_product_frac) |> 
   slice_tail(n = 1) |>              
   ungroup() 
@@ -591,15 +659,28 @@ study_prod_time |>
   group_by(arm) |> 
   summarise(
     mean_time = mean(time_between_final_dose_and_v2, na.rm = TRUE),
+    mean_hours = mean_time * 24, # convert to hours
     median_time = median(time_between_final_dose_and_v2, na.rm = TRUE),
+    median_hours = median_time * 24, # convert to hours
     sd_time = sd(time_between_final_dose_and_v2, na.rm = TRUE),
+    sd_hours = sd_time * 24, # convert to hours
     n = n(),
     CI = list(DescTools::MeanCI(time_between_final_dose_and_v2, conf.level = 0.95, na.rm = TRUE))
   ) |> 
   mutate(
-    CI_text = str_c("(", round(map_dbl(CI, ~ .x[2]), 2), "-", round(map_dbl(CI, ~ .x[3]), 2), ")")
+    CI_text = str_c("(", round(map_dbl(CI, ~ .x[2]), 2), "-", round(map_dbl(CI, ~ .x[3]), 2), ")"),
+    CI_hours = str_c("(", round(map_dbl(CI, ~ .x[2] * 24), 2), "-", round(map_dbl(CI, ~ .x[3] * 24), 2), ")")
   ) |>
-  select(arm,n, median_time, mean_time, sd_time, CI_text)
+  select(arm,n, median_hours, mean_hours, sd_hours, CI_hours) |> 
+  gt() |> 
+  gt::cols_label(
+    arm = "Arm",
+    n = "N mITT participants",
+    median_hours = "Median time between final dose and visit 2 (hours)",
+    mean_hours = "Mean time between final dose and visit 2 (hours)",
+    sd_hours = "Standard deviation (hours)",
+    CI_hours = "95% CI (hours)"
+  )
 
 ```
 
@@ -609,14 +690,14 @@ study_prod_time |>
 
 study_prod_time |> 
   ggplot() + 
-  aes(x = time_between_final_dose_and_v2*24, y = pid) +
+  aes(x = time_between_final_dose_and_v2 * 24, y = pid) +
   geom_point() + 
   geom_vline(xintercept = c(24, 48, 72, 96), linetype = "dashed", color = "steelblue") +
   scale_x_continuous(
-    breaks = seq(0, 24*4, by = 12),  
+    breaks = seq(0, 24 * 4, by = 12),  
     name = "Time between final dose and visit 2 (hours)"
   ) +
-  facet_grid(site~arm, scales = "free_y", space = "free_y")
+  facet_grid(site + arm ~ ., scales = "free_y", space = "free_y")
 
 ```
 
@@ -707,6 +788,8 @@ nugent_score |>
   #filter(prop_tot_LBP > 0) 
   
 ```
+
+
 ```{r}
 
 #nugent score of active arm at visit 1100 
