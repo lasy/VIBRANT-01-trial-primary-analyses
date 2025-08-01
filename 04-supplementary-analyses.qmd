@@ -375,7 +375,59 @@ applicator |>
   
 ```
 
+##### Among those who brought in at leat 7 applicator
 
+::: callout-caution
+The variable `number_applicator` is defined as the number of **used** applicators returned.  
+If a participant brings back 5 used applicators and 2 unused applicators, should `number_applicator` be 5 or 7?  
+Currently, we assume that it will be 7.
+:::
+
+- Proportion of participants that returned applicators (0.933)
+- Proportion of participants with returned applicators for which the staining analysis was done (0.988)
+
+```{r}
+
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  group_by(pid) |> 
+  summarise(
+    used_applicators_returned = ifelse(any(used_applicators == "Yes", na.rm = TRUE), "Yes", "No"),
+    applicator_stained = ifelse(any(!is.na(total_applicators_stained)), "Yes", "No"),
+    .groups = "drop"
+  )|> 
+  dplyr::count(used_applicators_returned, applicator_stained) |> 
+  mutate(
+    prop = round(n / sum(n), 3)
+  ) |> 
+  gt() |> 
+  cols_label(
+    used_applicators_returned = "Used applicators returned",
+    applicator_stained = "Applicator stained",
+    n = "N participants",
+    prop = "Percentage"
+  )
+  
+```
+
+```{r}
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  dplyr::count(used_applicators) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt()
+```
+
+
+```{r}
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  filter(used_applicators == "Yes") |> 
+  dplyr::count(total_applicators_stained == 0|is.na(total_applicators_stained)) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt()
+  
+```
 
 #### Staining analysis 
 
@@ -458,6 +510,104 @@ applicator |>
   cols_label(
     `(applicator_stain_positive > 1 & n_product_doses > 1)` = "More than 1 applicator stained positive and more than 1 product doses taken"
   )
+```
+
+###### Among those who brought in at least 7 applicators
+
+Concordance between self-reports and applicator staining:
+
+- scatter plot of # of self-reported doses vs # of positive staining
+
+```{r}
+
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  mutate(
+    applicator_stain_positive = 
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
+  ) |>
+  dplyr::count(n_product_doses, applicator_stain_positive) |>
+  ggplot(aes(x = n_product_doses |> as.factor(), 
+             y = applicator_stain_positive, 
+             fill = n)) + 
+  geom_tile() +
+  geom_text(aes(label = n), size = 3) +
+  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
+  guides(fill = "none") +
+  xlab("Number of doses taken") +
+  ylab("Positive applicator (n)") + 
+  ggtitle("Among participants who brought in at least 7 applicators")
+
+```
+
+```{r}
+
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  mutate(
+    applicator_stain_positive = 
+      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
+  ) |>
+  ggplot(aes(x = n_product_doses |> as.factor(), 
+             y = applicator_stain_positive, 
+             col = n_product_doses |> as.factor())) + 
+  geom_point() + 
+  geom_jitter(width = 0.2, height = 0.2) + 
+  labs(x = "Number of study product doses", 
+       y = "Number of applicator stained positive") + 
+  guides(col = "none") + 
+  ggtitle("Among participants who brought in at least 7 applicators")
+
+```
+
+
+- Number of participants that self-reported using at least one dose (= XX) (90)
+- Number of participants that had at least one positive staining (= YY) (82)
+
+```{r}
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  dplyr::count(n_product_doses) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    n_product_doses = "Number of study product doses taken"
+  ) |> 
+  tab_header(title = "Among those who brought in at least 7 applicators")
+
+```
+
+
+```{r}
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  dplyr::count(applicator_stain_positive > 1) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `applicator_stain_positive > 1` = "More than 1 applicator stained positive"
+  ) |> 
+  tab_header(title = "Among those who brought in at least 7 applicators")
+
+```
+
+
++ contingency table of self-reported doses and positive staining (ok)
+
+- Proportion of participants self-reported using at least one dose **and** have at least one positive staining  (= ZZ/XX) (=82)
+
+```{r}
+
+applicator |> 
+  filter(number_applicators >= 7) |> 
+  dplyr::count((applicator_stain_positive > 1&n_product_doses>1)) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `(applicator_stain_positive > 1 & n_product_doses > 1)` = "More than 1 applicator stained positive and more than 1 product doses taken"
+  ) |> 
+  tab_header(title = "Among those who brought in at least 7 applicators")
+  
 ```
 
 
@@ -700,6 +850,78 @@ study_prod_time |>
   facet_grid(site + arm ~ ., scales = "free_y", space = "free_y")
 
 ```
+
+
+#### Sensitive analyses 
+See "At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance."
+
+We take the "colonized at" data from the `col_LBP_mg` SE. We filter for participants in "LC-106-7" and "LC-115" arm and for visit 1300, 1400 and 1400. 
+Among participants colonized at (primary outcome), LBP strains made up >= 50% in 0.849%. 
+
+```{r}
+
+col_at <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT, arm %in% c("LC-106-7", "LC-115")) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code %in% c("1300", "1400", "1500"), 
+                    .feature == "colonized_LBP_at_mg")
+  ) |> 
+  filter(outcome) 
+
+col_at |> 
+  left_join(mae[["mg"]] |> as_tibble(), by = ".sample") |> 
+  filter(!is.na(LBP)) |> # only LBP strain
+  group_by(.sample) |> 
+  summarise(
+    prop_tot_LBP = sum(rel_ab, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  dplyr::count(prop_tot_LBP >= 0.5) |> 
+  mutate(prop = round(n / sum(n), 3)) |> 
+  gt() 
+
+  
+
+```
+
+```{r}
+
+# old
+
+# propLBP_week3_5 <- 
+#   mae[["mg"]] |> 
+#   as_tibble() |> 
+#   dplyr::left_join(
+#     mae@colData |> as_tibble() |> select(uid, pid, arm, mITT, visit_code),
+#     by = join_by(.sample == uid)
+#   ) |>
+#   filter(mITT) |> 
+#   filter(arm %in% c("LC-106-7", "LC-115")) |> 
+#   filter(visit_code %in% c("1300", "1400", "1500")) |> 
+#   filter(!is.na(LBP)) |> 
+#   group_by(pid, visit_code) |>
+#   summarise(
+#     prop_tot_LBP = sum(rel_ab, na.rm = TRUE),
+#     .groups = "drop"
+#   ) 
+# 
+# propLBP_week3_5|>
+#   dplyr::count(prop_tot_LBP > 0)
+# 
+# propLBP_week3_5 |>
+#   dplyr::count(prop_tot_LBP > 0.5)
+
+```
+
 
 ### LBP colonization in participants with BV post-MTZ
 
