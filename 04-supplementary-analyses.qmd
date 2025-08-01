@@ -1011,13 +1011,15 @@ nugent_score |>
   
 ```
 
+This table should be the same as Table 3 in the paper, but it differs slightly: we have 6 for Pl and not 8, 1 and not 2 for LC-106-o and 2 and not 3 for LC-115. 
+I think the missing participants are participants with missing values for which we would have taken the value from the previous visit.
 
 ```{r}
 
 #nugent score of active arm at visit 1100 
 nugent_score |> 
-  filter(visit_code == "1100") |> 
-  group_by(arm) |>
+  filter(visit_code == "1100") |> #%in% c("1100", "1500", "2120")
+  group_by(arm) |> #visit_code
   summarise(
     n = n(),
     n_positive = sum(nugent_positive, na.rm = TRUE),
@@ -1042,7 +1044,60 @@ nugent_score |>
 
 ```
 
-See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY vs. YY/YY who did not colonize (p = YY).*"
+See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY (16/45) vs. YY/YY (25/48) who did not colonize (p = YY).*"
+
+> Question : how is define recurrence (at week 5, week 12) ? The participant must have been cured between "after MTZ" and week 5 (12) ? 
+
+```{r}
+# Active arms vs. placebo, 
+# at 5 weeks recurrence was 33% vs. 67% (p = 0.05) -> OK 
+# at 12 weeks recurrence was 44% vs. 70% (p = 0.13) -> ?
+
+# nugent_score |> 
+#   filter(visit_code != "0000") |>  # remove visit 0 
+#   group_by(pid) |> 
+#   mutate(n_cured = sum(!nugent_positive, na.rm = TRUE)) |> 
+#   ungroup() |> 
+#   filter(visit_code == "1500", active_arm) |> 
+#   dplyr::count(nugent_positive, n_cured)
+```
+
+```{r}
+col_by_week5 <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
+  ) |> 
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
+
+
+nugent_score |> 
+  left_join(col_by_week5 |> select(pid, LBP_colonization_by_week5), 
+            by = "pid") |> 
+  arrange(pid, visit_code) |>
+  group_by(pid) |>
+  summarise(
+    LBP_colonization_by_week5 = any(LBP_colonization_by_week5, na.rm = TRUE),
+    BV_recurrence = {
+      cured <- cumsum(!nugent_positive & !is.na(nugent_positive)) > 0
+      any(nugent_positive & cured, na.rm = TRUE)
+    },
+    .groups = "drop"
+  ) |> 
+  dplyr::count(LBP_colonization_by_week5, BV_recurrence)
+
+
+```
+
 
 ```{r}
 
@@ -1101,6 +1156,8 @@ nugent_score |>
 ```
 
 Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY vs. YY/YY who did not colonize (p = YY).
+
+> TODO : BV recurrence : il faut avoir été cured pour avoir une BC recurrence Cured quand ? n'importe quand entre MTZ et w12 ? 
 
 ```{r}
 
