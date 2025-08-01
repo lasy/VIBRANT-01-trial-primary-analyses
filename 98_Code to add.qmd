@@ -611,6 +611,8 @@ study_prod_time |>
 ## Sensitive analyses 
 At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance.
 
+
+--> reprendre le colonise at -> filtrer ceux pour lesquels c'est TRUE entre visite 1300 et 1500 et puis regarder combien on une proportion >0.5
 ```{r}
 
 propLBP_week3_5 <- 
