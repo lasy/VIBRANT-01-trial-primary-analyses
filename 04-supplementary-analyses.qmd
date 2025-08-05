@@ -288,8 +288,8 @@ Two participants returned eight applicators. In both cases, comments explain tha
 
 
 ```{r}
-#| fig-height: 6
-#| fig-width: 8
+#| fig-height: 8
+#| fig-width: 6
 
 applicator |> 
   ggplot(aes(x = visit_code, y = pid, fill = number_applicators |> as.factor())) +
@@ -309,8 +309,9 @@ applicator |>
   labs(
     x = "Visit code",
     y = "Participant ID",
-    title = "Number of applicator returned (out of number applicator stained positive)") + 
-  theme(axis.text.y = element_text(size=4))
+    title = "Number of applicator returned (out of number applicator stained positive)")  + 
+  theme(axis.text.y = element_text(size = 6))
+
 ```
 
 
@@ -379,7 +380,7 @@ applicator |>
 
 ::: callout-caution
 The variable `number_applicator` is defined as the number of **used** applicators returned.  
-If a participant brings back 5 used applicators and 2 unused applicators, should `number_applicator` be 5 or 7?  
+If a participant brings back 5 used applicators and 2 unused applicators, would the `number_applicator` variable be 5 or 7?  
 Currently, we assume that it will be 7.
 :::
 
@@ -641,7 +642,9 @@ filter(PP) |>
   guides(fill = "none") +
   xlab("Number of doses taken") +
   ylab("Positive applicator (n)")
+
 ```
+
 ```{r}
 
 
@@ -852,11 +855,12 @@ study_prod_time |>
 ```
 
 
-#### Sensitive analyses 
+#### Sensitivity analyses 
+
 See "At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance."
 
 We take the "colonized at" data from the `col_LBP_mg` SE. We filter for participants in "LC-106-7" and "LC-115" arm and for visit 1300, 1400 and 1400. 
-Among participants colonized at (primary outcome), LBP strains made up >= 50% in 0.849%. 
+Among participants colonized at (primary outcome), LBP strains made up >= 50% in 84.9%. 
 
 ```{r}
 
