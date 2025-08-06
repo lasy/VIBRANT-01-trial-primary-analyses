@@ -1318,7 +1318,7 @@ rel_abs |>
   summarise(
     detected = any(!is.na(LBP) & rel_ab > 0, na.rm = TRUE),
     crispatus_abundance = sum(rel_ab[species == "crispatus"], na.rm = TRUE), 
-    crispatus_dominance = ifelse(crispatus_abundance>0.5, TRUE, FALSE), 
+    crispatus_dominance = ifelse(crispatus_abundance > 0.5, TRUE, FALSE), 
     .groups = "drop"
   ) |> 
   filter(detected) |> 
