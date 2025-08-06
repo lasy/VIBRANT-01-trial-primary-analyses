@@ -933,22 +933,27 @@ see "After oral metronidazole treatment, 22/70 (30%) people still had a Nugent s
 
 The Nugent score is available in CRF14. We are interested in the Nugent score value at the visit following metronidazole treatment (visit 1100).
 
-We first create a table containing the Nugent score for all participants at all visits. We then create a variable `nugent_positive`, which is `TRUE` if `nugent_total_score >= 7` and `FALSE` otherwise. We also create a variable `active_arm` to group participant by active arm (i.e. LC106-o, LC-106-7, LC-106-3, LC-115) vs Placebo 
+We first create a table containing the Nugent score for all participants at all visits. We then create a variable `nugent_positive`, which is `TRUE` if `nugent_total_score >= 7` and `FALSE` otherwise. We also create a variable `active_arm` to group participant by active arm (i.e. LC106-o, LC-106-7, LC-106-3, LC-115) *vs* Placebo 
 
 ```{r}
 # nugent score for all visits 
 nugent_score <- 
-  metadata(mae)$crf_data_clean$crf14 |> 
-  as_tibble() |> 
-  select(uid, pid, visit_code, study_day, nugent_total_score) |> 
-  left_join(
-    mae@colData |> as_tibble() |> 
-    select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-    distinct()) |>
+  mae@colData |> as_tibble() |> 
+  select(uid, pid, visit_code, study_day, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
   filter(randomized, mITT) |> 
+  left_join(
+    metadata(mae)$crf_data_clean$crf14 |> 
+      as_tibble() |> 
+      select(uid, nugent_total_score)
+  ) |> 
+  group_by(visit_code) |> 
+  mutate(any_Nugent = any(!is.na(nugent_total_score))) |> 
+  ungroup() |> 
+  filter(any_Nugent) |> 
   group_by(pid) |>
   mutate(
-    active_arm = ifelse(arm!="Pl", TRUE, FALSE), 
+    active_arm = ifelse(arm != "Pl", TRUE, FALSE), 
     nugent_positive = ifelse(nugent_total_score >= 7, TRUE, FALSE)
   ) |> 
   ungroup()
@@ -962,13 +967,14 @@ nugent_score <-
 nugent_score |> 
   filter(visit_code == "1100") |> 
   ggplot()+ 
-  aes(x = nugent_total_score |> as.factor(), y = pid, fill = nugent_positive |> as.factor()) +
+  aes(x = nugent_total_score |> as.factor(), y = pid |> as.factor(), fill = nugent_positive |> as.factor()) +
   geom_tile() +
   scale_fill_manual(
     name = "Nugent score >= 7",
     values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
-    na.translate = FALSE
+    na.value = "gray50"
   ) + 
+  scale_y_discrete(drop = FALSE) |> 
   labs(x = "Nugent score", y = "Participant ID", title = "Nugent score at visit 1100") + 
   theme(axis.text.y = element_text(size = 4))
   
@@ -984,34 +990,77 @@ nugent_score |>
   labs(x = "Visit Code", y = "Participant ID") + 
   theme(axis.text.y = element_text(size = 4))
 
+  
+nugent_score |> 
+  ggplot()+ 
+  aes(x = visit_code, y = pid, fill = nugent_total_score) +
+  geom_tile() +
+  scale_fill_gradient(
+    name = "Nugent score",
+    low = "lightblue1", high = "red3"
+  ) + 
+  labs(x = "Visit Code", y = "Participant ID") + 
+  theme(axis.text.y = element_text(size = 4))
+
 
 ```
 
+
+
+
+
+```{r}
+
+nugent_score |>
+  filter(visit_code == "1100") |> 
+  dplyr::count(nugent_positive) |> 
+  gt(caption = "Number of mITT participant with BV (nugent_positive == TRUE) post-MTZ (visit 1100)")
+
+```
+
+```{r}
+
+nugent_score |>
+  filter(visit_code == "1100") |> 
+  dplyr::count(active_arm, nugent_positive) |> 
+  gt(caption = "Number of mITT participant with BV (nugent_positive == TRUE) post-MTZ (visit 1100) by active arm")
+
+```
+
+
+
+
 At visit 1100, among participants with BV who were exposed to the LBP (i.e., in the active arm), 5 participants had a detectable LBP strain identified after treatment by metagenomics.
- 
+
 
 ```{r}
 
 # among the 12 of these people exposed to LBP
 
-nugent_score |>
+tmp <- 
+  nugent_score |>
   filter(visit_code == "1100") |> 
   filter(active_arm) |>
-  filter(nugent_positive) |>
+  # filter(nugent_positive | is.na(nugent_positive)) |> #  
   left_join(
+    # add mg data to see how many had detectable LBP strain post-MTZ
     mae[["mg"]] |> as_tibble() |>  # add mg data
       dplyr::left_join(
         mae@colData |> as_tibble() |> select(uid, pid, visit_code),
         by = join_by(.sample == uid)
       ) |>
-      filter(visit_code == "1200"),
+      filter(visit_code == "1200", !poor_quality_mg_data)|>
+      filter(!is.na(LBP)) |> #only LBP strain
+      group_by(pid) |>
+      summarise(prop_tot_LBP = sum(rel_ab)) |>
+      arrange(prop_tot_LBP |> desc()) |> 
+      mutate(LBP_detected_post_INT = prop_tot_LBP >= 0.05),
     by = c("pid")
-  ) |>
-  filter(!is.na(LBP)) |> #only LBP strain
-  group_by(pid) |>
-  summarise(prop_tot_LBP = sum(rel_ab)) |>
-  arrange(prop_tot_LBP |> desc())
-  #filter(prop_tot_LBP > 0) 
+  )  
+
+tmp |> 
+  dplyr::count(nugent_positive, LBP_detected_post_INT) |> 
+  gt(caption = "Number of mITT participant in one of the active arms with BV diagnosis post-MTZ (visit 1100) and LBP detection (>= 5% total LBP rel. ab) post-INT (visit 1200)")
   
 ```
 
@@ -1026,6 +1075,7 @@ nugent_score |>
   group_by(arm) |> #visit_code
   summarise(
     n = n(),
+    n_missing = sum(is.na(nugent_positive)), 
     n_positive = sum(nugent_positive, na.rm = TRUE),
     p = n_positive / n,
     CI = binom::binom.confint(n_positive, n, method = "exact")
@@ -1041,7 +1091,8 @@ nugent_score |>
   ) |>
   cols_label(
     n = "N participants",
-    n_positive = "n (%) participants with nugent score >= 7",
+    n_missing = "n participants without Nugent score",
+    n_positive = "n (%) participants with Nugent score ≥ 7",
     pct = "Percentage",
     CI_text = "95% CI"
   )
@@ -1049,6 +1100,55 @@ nugent_score |>
 ```
 
 See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY (16/45) vs. YY/YY (25/48) who did not colonize (p = YY).*"
+
+
+```{r}
+
+
+rBV_stats <- 
+  # we first define for each mITT participant whether they were BV-cured or not post-MTZ by Nugent
+  nugent_score |> 
+  select(-any_Nugent, -nugent_positive) |> 
+  filter(visit_code == "1100") |> 
+  mutate(BV_cure_post_MTZ = nugent_total_score < 7) |> 
+  # we then specify for each of these participants whether they met the criteria for the primary endpoint of LBP colonization by week 5
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg") |> 
+      mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) |> 
+      select(pid, LBP_colonization_by_week5),
+    by = join_by(pid)
+  ) |> 
+  # we next check who had BV (or rBV) by week 12
+  left_join(
+    nugent_score |> 
+      select(pid, visit_code, nugent_positive) |> 
+      filter(as.numeric(visit_code) > 1100, as.numeric(visit_code) <= 2120) |> 
+      # QUESTION for line above: should it be any time after the post-MTZ visit or anytime between week 5 and 12???
+      group_by(pid) |> 
+      summarize(
+        BV_by_week12 = any(nugent_positive, na.rm = TRUE),
+        BV_after_week5 = any(nugent_positive & as.numeric(visit_code) > 1500, na.rm = TRUE), # any BV after week 5
+        ),
+    by = join_by(pid)
+  ) |> 
+  mutate(
+    rBV_by_week12 = BV_by_week12 & BV_cure_post_MTZ, # rBV if BV by week 12 and cured post-MTZ
+  )
+  
+  
+rBV_stats |> filter(active_arm) |> dplyr::count(active_arm, LBP_colonization_by_week5, BV_after_week5)
+
+```
+
+
+
+
 
 > Question : how is define recurrence (at week 5, week 12) ? The participant must have been cured between "after MTZ" and week 5 (12) ? 
 
@@ -1088,7 +1188,7 @@ nugent_score |>
   left_join(col_by_week5 |> select(pid, LBP_colonization_by_week5), 
             by = "pid") |> 
   arrange(pid, visit_code) |>
-  group_by(pid) |>
+  group_by(pid, active_arm) |>
   summarise(
     LBP_colonization_by_week5 = any(LBP_colonization_by_week5, na.rm = TRUE),
     BV_recurrence = {
@@ -1097,7 +1197,7 @@ nugent_score |>
     },
     .groups = "drop"
   ) |> 
-  dplyr::count(LBP_colonization_by_week5, BV_recurrence)
+  dplyr::count(active_arm, LBP_colonization_by_week5, BV_recurrence)
 
 
 ```

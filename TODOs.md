@@ -7,7 +7,7 @@
     -   [ ] Add a supplementary table
     -   [ ] Fix numbers/language in main text
 -   [ ] Risk ratio (RR) in Table 2 (Laura S!)
-    -   [ ] Compute it
+    -   [ ] Compute it (check which test and which CI formula/assumptions are most suited)
     -   [ ] Update the main table
     -   [ ] Fix numbers/language in main text
 -   [ ] Applicator staining
@@ -33,6 +33,7 @@
 Once daily qPCR data is available
 
 -   [ ] Using a threshold of detecting at least two LBP strains at \> YY copies/Y at a given visit, YY/YY people exposed to active study product had detection of LBP strains during dosing. The mean proportion of exposed days at which study product strains were detected was YY (Y-Y).
+-   [ ] Among the people with Nugent >= 7 post-MTZ, how many had a detectable LBP ... by qPCR
 
 
 
