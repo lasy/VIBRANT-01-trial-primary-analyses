@@ -234,22 +234,41 @@ applicator_returned <-
   select(uid, pid, visit_code, study_day, used_applicators, number_applicators) |> 
   group_by(pid)
 
-exposure <- 
-  mae@colData |> 
-  as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
+study_product <-
+  mae@colData |>
+  as_tibble() |>
+  select(pid, site, randomized, arm, ITT, mITT, PP) |>
+  distinct() |>
+  filter(randomized, mITT) |>
   left_join(
-    metadata(mae)$exposures |> 
-  as_tibble() |> 
-  select(pid, visit_code, study_day, study_product), 
-  by = "pid"
-  ) |> 
-  group_by(pid) |> 
+    exposures,
+    by = "pid"
+  ) |>
+  group_by(pid) |>
   summarise(
     n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE)
-  )
+  ) |>
+  ungroup()
+
+# depuis la mise a jour de la table exposures (dfseq replace by visit_code --> ne fonctionne plus)
+# il faut prendre la table exposures Rdata plutot que via le mae 
+
+# exposure <- 
+#   mae@colData |> 
+#   as_tibble() |> 
+#   select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+#   distinct() |> 
+#   filter(randomized, mITT) |> 
+#   left_join(
+#     metadata(mae)$exposures |> 
+#   as_tibble() |> 
+#   select(pid, visit_code, study_day, study_product), 
+#   by = "pid"
+#   ) |> 
+#   group_by(pid) |> 
+#   summarise(
+#     n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE)
+#   )
 
 applicator <- 
   mae@colData |> as_tibble() |> 
@@ -608,7 +627,8 @@ study_prod_time |>
 ```
 
 
-## Sensitive analyses 
+## ✅ Sensitivity anlyses
+
 At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance.
 
 

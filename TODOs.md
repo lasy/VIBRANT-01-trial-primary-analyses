@@ -2,8 +2,8 @@
 
 -   [ ] Proportion of participants with a positive primary outcome who still have detection at week 12
     -   [x] Compute it
-    -   [ ] Join the table "by arm" and "overall"
-    -   [ ] In the overall proportion, make one version without filtering for the Placebo arm (as is right now) and one version without the Placebo arm ("new todo")
+    -   [x] Join the table "by arm" and "overall"
+    -   [x] In the overall proportion, make one version without filtering for the Placebo arm (as is right now) and one version without the Placebo arm ("new todo")
     -   [ ] Add a supplementary table
     -   [ ] Fix numbers/language in main text
 -   [ ] Risk ratio (RR) in Table 2 (Laura S!)
@@ -14,7 +14,7 @@
     -   [x] Compute the numbers
     -   [ ] Add a supplementary table and/or figure
     -   [ ] Double-check that that the 2 participants that "have 6 doses" correspond to cases where they inserted the dose, but the tablet fell off. (and think about updating the `exposure` table to reflect these subtle different scenarios)
-    -   [ ] Add a table with the % of participants with the following categories: 100% of stained applicators positive, >50% of stained ..., and 0.
+    -   [x] Add a table with the % of participants with the following categories: 100% of stained applicators positive, \>50% of stained ..., and 0.
     -   [x] Make an additional analysis, filtering for participants who returned their complete set of applicators
     -   [ ] Fix numbers/language in main text
 -   [x] In the two arms with 7 days of dosing, the average duration of time between final dose and the week 2 sampling visit was YYY (LC106) and YYY (LC115).
@@ -34,20 +34,12 @@ Once daily qPCR data is available
 
 -   [ ] Using a threshold of detecting at least two LBP strains at \> YY copies/Y at a given visit, YY/YY people exposed to active study product had detection of LBP strains during dosing. The mean proportion of exposed days at which study product strains were detected was YY (Y-Y).
 
-
-
 In Manuscript
 
-- [ ] Laura S to update affiliation
-- [ ] Laura V to update affiliation
-- [ ] Lara W in acknowledgments
-- [ ] Contributions
-
-
-
-
-
-
+-   [ ] Laura S to update affiliation
+-   [ ] Laura V to update affiliation
+-   [ ] Lara W in acknowledgments
+-   [ ] Contributions
 
 # OLD ---- VIBRANT primary trial analyses - TODO
 
