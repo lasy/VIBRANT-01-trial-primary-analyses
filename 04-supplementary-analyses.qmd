@@ -73,13 +73,13 @@ col_still_col <-
 
 ```
 
-#### By site and arm
+#### All arms 
 
-Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
+##### By site and arm
 
 ```{r}
 
-summary_table_still_col <-
+summary_col_still_col <-
   col_still_col |> 
   filter(LBP_colonization_by_week5) |>
   group_by(site, arm) |> 
@@ -89,15 +89,44 @@ summary_table_still_col <-
     .groups = "drop"
   ) |> 
   mutate(
-    p = n_success / n,
+    p_col_stil_col = n_success / n,
     CI = binom::binom.confint(n_success, n, method = "exact")
   )
 
+```
+
+Plot (Figure 3b)
+
+```{r}
+
+summary_col_still_col |> 
+  ggplot() +
+  aes(x = arm, y = p_col_stil_col, col = site) +
+  geom_errorbar(
+    aes(ymin = CI$lower, ymax = CI$upper), 
+    linewidth = 1, alpha = 0.7,
+    width = 0.3, position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_color_manual("Study site", values = site_colors) +
+  xlab("") + 
+  ylab("Proportion of participants colonized by week 5\nwith LBP strain detected at week 12") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+
+Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
+
+```{r}
+
 table_still_col <- 
-  summary_table_still_col |> 
+  summary_col_still_col |> 
   mutate(
     N_per_site_and_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
     CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
   ) |> 
   dplyr::select(
@@ -139,7 +168,7 @@ table_still_col |>
 
 ```
 
-#### By arm
+##### By arm
 
 ```{r}
 
@@ -203,9 +232,7 @@ table_still_col |>
 ```
 
 
-#### Overall
-
-##### All arms 
+##### Overall
 
 Overall colonization at week 12 among participants colonized by week 5
 
@@ -294,7 +321,159 @@ table_still_col |>
 ```
 
 
-##### Active arms 
+#### Active arms 
+
+##### By site and arm
+
+```{r}
+
+summary_col_still_col <-
+  col_still_col |> 
+  filter(LBP_colonization_by_week5) |>
+  filter(arm != "Pl") |> 
+  group_by(site, arm) |> 
+  summarize(
+    n = n(),  # total with colonization at week 5
+    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p_col_stil_col = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+Plot (Figure 3b)
+
+```{r}
+
+summary_col_still_col |> 
+  ggplot() +
+  aes(x = arm, y = p_col_stil_col, col = site) +
+  geom_errorbar(
+    aes(ymin = CI$lower, ymax = CI$upper), 
+    linewidth = 1, alpha = 0.7,
+    width = 0.3, position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_color_manual("Study site", values = site_colors) +
+  xlab("") + 
+  ylab("Proportion of participants colonized by week 5\nwith LBP strain detected at week 12")
+
+```
+
+
+Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
+
+```{r}
+
+table_still_col <- 
+  summary_col_still_col |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+
+table_still_col |> 
+  group_by(site) |> 
+  gt(caption = "Colonization at week 12 among\nparticipant colonized by week 5 by arm and site", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+
+```
+
+##### By arm
+
+```{r}
+
+summary_table_still_col <-
+  col_still_col |> 
+  filter(LBP_colonization_by_week5) |>
+  group_by(arm) |> 
+  summarize(
+    n = n(),  # total with colonization at week 5
+    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+    .groups = "drop"
+  ) |> 
+  mutate(
+    p = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+table_still_col <- 
+  summary_table_still_col |> 
+  mutate(
+    N_per_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    arm, N_per_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |> 
+  pivot_wider(
+    id_cols = c(name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    )
+
+
+table_still_col |> 
+  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+
+```
+
+##### Overall 
 
 Overall colonization at week 12 among participants colonized by week 5
 
@@ -937,17 +1116,12 @@ We compute this time based on self-reported time of last study product use (dail
 
 To compute the time between the last dose taken prior to the in-person visit at week 2, we use information from three sources: crf32 for the time of insertion of the study product, the exposure table for the date of the last dose, and the visits_crfs_merged table for the study day of the week 2 in-person visit.
 
-To better estimate this time interval, we combine the `study_day` (which reflects the calendar day of product use) with `insertion_study_product_time` to account for the time of day the product was inserted. Specifically, we convert the reported insertion window into a fractional day value and add it to the study day, as follows:
+We create category of the time of the last study product : 
 
-*   Before 6am: 0.125
-*   Early morning (6–9am): 0.25
-*   Late morning (9–12pm): 0.4375
-*   Early afternoon (12–3pm): 0.5625
-*   Late afternoon (3–6pm): 0.6875
-*   Evening (6–9pm): 0.8125
-*   Late evening (9pm–midnight): 0.9375
+*   `same day` : last dose taken on the same day as the visit (before 6 p.m.)
+*   `day before` : last dose taken the day before the visit 
+*   `more thean 1 day` : last dose taken more than one day as the visit
 
-For the week 2 in-person visit, we also assume it occurred during the day (rather than at midnight), so we add 0.5 to the visit's study_day to reflect a likely early afternoon visit time.
 
 ```{r}
 #| eval: true
@@ -968,20 +1142,8 @@ study_product <-
   dplyr::rename(
     study_day_product = study_day,
     visit_code_product = visit_code
-  ) |>
-  mutate(
-    study_day_product_frac =
-      dplyr::case_when(
-        insert_study_product_time == "Before 6am" ~ study_day_product + 0.125,
-        insert_study_product_time == "Early morning (6am-9am)" ~ study_day_product + 0.3125,
-        insert_study_product_time == "Late morning (9am-12pm)" ~ study_day_product + 0.4375,
-        insert_study_product_time == "Early afternoon (12pm-3pm)" ~ study_day_product + 0.5625,
-        insert_study_product_time == "Late afternoon (3pm-6pm)" ~ study_day_product + 0.6875,
-        insert_study_product_time == "Evening (6pm-9pm)" ~ study_day_product + 0.8125,
-        insert_study_product_time == "Late evening (9pm-midnight)" ~ study_day_product + 0.9375,
-        TRUE ~ study_day_product
-           )
-    )
+  ) |> 
+  select(-vaginal_swab_collection_time)
 
 
 # study_day visit 2 in person
@@ -995,110 +1157,96 @@ visit2_studyday <-
   dplyr::rename(
     study_day_v2 = study_day
   ) |> 
-  dplyr::filter(!is.na(study_day_v2)) |> 
-  mutate(
-    study_day_v2 = study_day_v2 + 0.5 # this assumes that the visit happened at noon (We don't think we have data/information about the time of visit)
-  )
-
+  dplyr::filter(!is.na(study_day_v2))
+  
 study_prod_time <- 
   study_product |> 
   left_join(visit2_studyday |> select(-visit_code), by = "pid") |> 
+  filter(arm!="Pl") |> 
   group_by(pid) |> 
   filter(study_product =="1") |> 
-  filter(study_day_product_frac <= study_day_v2) |>  # we only consider doses that were taken before the visit 2
-  arrange(study_day_product_frac) |> 
+  filter(study_day_product <= study_day_v2) |>  # only consider doses taken before v2
+  filter(!((study_day_product == study_day_v2) & (insert_study_product_time %in% c("Late evening (9pm-midnight)", "Evening (6pm-9pm)")))) |> 
+  arrange(study_day_product) |> 
   slice_tail(n = 1) |>              
   ungroup() 
 
-
-# filter for participant in LC-106-7 and LC-115 and compute the difference in time
+# create category 
 study_prod_time <- 
   study_prod_time |> 
-  filter(arm %in% c("LC-106-7", "LC-115")) |> 
-  mutate(
-    time_between_final_dose_and_v2 = study_day_v2 - study_day_product_frac
-  )
+  mutate(last_dose = case_when(
+    study_day_product == study_day_v2 ~ "same day", 
+    study_day_product == study_day_v2-1 ~ "day before", 
+    study_day_product < study_day_v2-1~ "more than one day"
+  ), 
+  last_dose = factor(last_dose, levels = c("same day", "day before", "more than one day")))
+
 
 ```
 
-
+Table
 
 ```{r}
-#| eval: true
 
-# mean and CI of time_between_final_dose_and_visit2 by arm
 study_prod_time |> 
-  group_by(arm) |> 
-  summarise(
-    mean_time = mean(time_between_final_dose_and_v2, na.rm = TRUE),
-    mean_hours = mean_time * 24, # convert to hours
-    median_time = median(time_between_final_dose_and_v2, na.rm = TRUE),
-    median_hours = median_time * 24, # convert to hours
-    sd_time = sd(time_between_final_dose_and_v2, na.rm = TRUE),
-    sd_hours = sd_time * 24, # convert to hours
-    n = n(),
-    CI = list(DescTools::MeanCI(time_between_final_dose_and_v2, conf.level = 0.95, na.rm = TRUE))
+  dplyr::count(last_dose) |> 
+  gt()
+
+```
+
+```{r}
+
+study_prod_time |> 
+  group_by(site, arm, last_dose) |> 
+  summarize(
+    n = n(),  
+    .groups = "drop"
   ) |> 
-  mutate(
-    CI_text = str_c("(", round(map_dbl(CI, ~ .x[2]), 2), "-", round(map_dbl(CI, ~ .x[3]), 2), ")"),
-    CI_hours = str_c("(", round(map_dbl(CI, ~ .x[2] * 24), 2), "-", round(map_dbl(CI, ~ .x[3] * 24), 2), ")")
-  ) |>
-  select(arm,n, median_hours, mean_hours, sd_hours, CI_hours) |> 
-  gt() |> 
-  gt::cols_label(
-    arm = "Arm",
-    n = "N mITT participants",
-    median_hours = "Median time between final dose and visit 2 (hours)",
-    mean_hours = "Mean time between final dose and visit 2 (hours)",
-    sd_hours = "Standard deviation (hours)",
-    CI_hours = "95% CI (hours)"
-  )
-
-```
-
-```{r}
-#| fig-height: 6
-#| fig-width: 8
-
-study_prod_time |> 
-  ggplot() + 
-  aes(x = time_between_final_dose_and_v2 * 24, y = pid) +
-  geom_point() + 
-  geom_vline(xintercept = c(24, 48, 72, 96), linetype = "dashed", color = "steelblue") +
-  scale_x_continuous(
-    breaks = seq(0, 24 * 4, by = 12),  
-    name = "Time between final dose and visit 2 (hours)"
-  ) +
-  facet_grid(site + arm ~ ., scales = "free_y", space = "free_y")
-
+  ungroup() |> 
+  pivot_wider(
+    id_cols = c(site, last_dose), 
+    names_from = arm,
+    values_from = n, values_fill = 0
+  ) |> 
+  group_by(site) |> 
+  gt()
 ```
 
 
 ### Sensitivity analyses 
 
-See "At YY of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in YY (%), suggesting that if the LBP strains were retained they usually established dominance."
+See "At **98** of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in **85** (**87**%), suggesting that if the LBP strains were retained they usually established dominance."
 
-We take the "colonized at" data from the `col_LBP_mg` SE. We filter for participants in "LC-106-7" and "LC-115" arm and for visit 1300, 1400 and 1400. 
-Among participants colonized at (primary outcome), LBP strains made up >= 50% in 84.9%. 
+We take the "colonized at" data from the `col_LBP_mg` SE. We filter for participants in active arms and for visits remote from dosing
+
+*   Week 3 to 5 for LC-106-7 and LC-115
+*   Week 2 to 5 for LC-106-o and LC-106-3
+
+Among participants who achieved the primary outcome, LBP strains made up >= 50% in YY
+
 
 ```{r}
 
 col_at <- 
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT, arm %in% c("LC-106-7", "LC-115")) |> 
+  mae@colData |> as_tibble() |>
+  select(pid, site, randomized, arm, ITT, mITT, PP) |>
+  distinct() |>
+  filter(randomized, mITT, arm != "Pl") |>
   left_join(
-    mae[["col_LBP_mg"]] |> 
-      as_tibble() |> 
+    mae[["col_LBP_mg"]] |>
+      as_tibble() |>
       dplyr::left_join(
         mae@colData |> as_tibble() |> select(uid, pid, visit_code),
         by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code %in% c("1300", "1400", "1500"), 
-                    .feature == "colonized_LBP_at_mg")
-  ) |> 
-  filter(outcome) # only primary outcome ahcieved 
+      )
+  ) |>
+  dplyr::filter(
+    .feature == "colonized_LBP_at_mg" &
+      (arm %in% c("LC-106-7", "LC-115") & visit_code %in% c("1300", "1400", "1500") |
+       arm %in% c("LC-106-o", "LC-106-3") & visit_code %in% c("1200", "1300", "1400", "1500")
+      )
+  ) |>
+  filter(outcome) # only primary outcome achieved 
 
 col_at |> 
   left_join(mae[["mg"]] |> as_tibble(), by = ".sample") |> 

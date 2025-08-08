@@ -499,8 +499,11 @@ rel_abs <-
         TRUE ~ "Other non-Lacto."
       )
   ) |> 
-  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
+  arrange(is.na(LBP), LBP,genus != "Lactobacillus", genus, -mean_rel_ab) |> 
   mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other Lactobacillus", "Other non-Lacto.", "Other", after = Inf))
+
+#  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
+
 
 
 ```
@@ -515,8 +518,22 @@ rel_abs_agg <-
 
 
 
+
 ```{r make-trajectories-plot}
 
+tmp <- 
+  rel_abs_agg |> 
+  mutate(pid_label = ifelse(PP, "", ifelse(mITT, "*", ""))) |> 
+  select(pid, pid_label) |> 
+  distinct() 
+pid_label <- setNames(tmp$pid_label, tmp$pid)
+
+strip_background <- strip_themed(
+  text_x = elem_list_text(colour = "black"),
+  background_x = elem_list_rect(fill = ifelse(levels(level3_long$cluster) == "1", "green",
+                                              ifelse(levels(level3_long$cluster) == "2", "red", "blue")))
+)
+  
 g_trajectories <-
   rel_abs_agg |>
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
@@ -529,27 +546,41 @@ g_trajectories <-
   arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
   mutate(
     pid = pid |> fct_inorder(),
-    visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric()),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
     ) |> 
-  ggplot(aes(y = rel_ab, x = pid, fill = taxon, alpha = ifelse(PP, "PP", "mITT"))) +
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
   geom_col() +
-  facet_grid(visit_label ~ arm + site, scales = "free", space = "free") +
+  facet_nested(
+    rows = vars(visit_label),
+    cols = vars(arm, site),
+    scales = "free_x", space = "free_x", 
+    strip = 
+      strip_nested(
+        background_x = elem_list_rect(fill = c(rep("lightgrey",5), 
+                                               rep(c("#FF0000", "#00868B"), 5))
+                                      ), 
+        text_x = elem_list_text(colour = c(rep("black", 5), rep("transparent", 10)))              
+        )
+  )+
   scale_fill_manual(
     values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
     labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
     guide = guide_legend(ncol = 1)
     ) +
-  scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
   scale_y_continuous(
-    "relative abundance", labels = scales::percent,
+    "Relative abundance", labels = scales::percent,
     breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
   ) +
-  scale_x_discrete("Participants") +
+  scale_x_discrete("Participants", labels = pid_label) +
   theme(
     strip.text.y = element_text(angle = 0, hjust = 0),
-    strip.text.x = element_text(angle = 90, hjust = 0),
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    strip.text.x = element_text(hjust = 0),
+    axis.text.x = element_text(hjust = 0.5, vjust = 0.5), 
+    axis.ticks.x = element_blank()
   )
+
+
 
 ```
 
@@ -559,7 +590,9 @@ g_trajectories <-
 #| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows. The alpha level (transparency) indicates whether the participant is part of the per-protocol (PP) or modified intention-to-treat (mITT) population."
 #| eval: true
 
-g_trajectories
+g_trajectories + theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+
+
 
 ```
 
