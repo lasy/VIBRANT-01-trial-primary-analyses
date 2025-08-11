@@ -146,8 +146,8 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         aes(ymin = CI_low, ymax = CI_high, fill = arm), 
         alpha = 0.1, color = NA
       ) +
-      geom_line() +
-      geom_point() + 
+      geom_line(linewidth = 0.75) +
+      geom_point(size = 1.5) + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
         "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
@@ -169,7 +169,6 @@ g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_coloniz
 g_prop_colonized_by + ggtitle(fig_title) 
 
 ```
-
 
 
 
@@ -528,12 +527,12 @@ tmp <-
   distinct() 
 pid_label <- setNames(tmp$pid_label, tmp$pid)
 
-strip_background <- strip_themed(
-  text_x = elem_list_text(colour = "black"),
-  background_x = elem_list_rect(fill = ifelse(levels(level3_long$cluster) == "1", "green",
-                                              ifelse(levels(level3_long$cluster) == "2", "red", "blue")))
-)
-  
+# strip_background <- ggh4x::strip_themed(
+#   text_x = ggh4x::elem_list_text(colour = "black"),
+#   background_x = ggh4x::elem_list_rect(fill = ifelse(levels(level3_long$cluster) == "1", "green",
+#                                               ifelse(levels(level3_long$cluster) == "2", "red", "blue")))
+# )
+#   
 g_trajectories <-
   rel_abs_agg |>
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
@@ -550,19 +549,26 @@ g_trajectories <-
     ) |> 
   ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
   geom_col() +
-  facet_nested(
+  ggh4x::facet_nested(
     rows = vars(visit_label),
     cols = vars(arm, site),
     scales = "free_x", space = "free_x", 
     strip = 
-      strip_nested(
-        background_x = elem_list_rect(fill = c(rep("lightgrey",5), 
-                                               rep(c("#FF0000", "#00868B"), 5))
-                                      ), 
-        text_x = elem_list_text(colour = c(rep("black", 5), rep("transparent", 10)))              
-        )
-  )+
+      ggh4x::strip_nested(
+        background_x = 
+          ggh4x::elem_list_rect(
+            fill = c(rep("gray90",5), 
+                     rep(c("#FF0000", "#00868B"), 5))
+          ), 
+        text_x = 
+          ggh4x::elem_list_text(
+            face = rep("bold", 15),
+            colour = c(rep("black", 5), rep("white", 5), "transparent", "white", "transparent", rep("white", 3))
+            )              
+      )
+  ) +
   scale_fill_manual(
+    "LBP strain or taxon",
     values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
     labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
     guide = guide_legend(ncol = 1)
@@ -574,25 +580,25 @@ g_trajectories <-
   ) +
   scale_x_discrete("Participants", labels = pid_label) +
   theme(
-    strip.text.y = element_text(angle = 0, hjust = 0),
-    strip.text.x = element_text(hjust = 0),
-    axis.text.x = element_text(hjust = 0.5, vjust = 0.5), 
-    axis.ticks.x = element_blank()
-  )
+    strip.background.y = element_rect(fill = "gray90"),
+    strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    strip.text.x = element_text(hjust = 0.5),
+    axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 15, margin = margin(t = -1)), 
+    axis.ticks.x = element_blank(),
+    legend.key.height = unit(15, "pt")
+  )  # theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
 
 
 
 ```
 
 ```{r display-trajectories-plot}
-#| fig-height: 9
-#| fig-width: 15
+#| fig-height: 7.5
+#| fig-width: 12
 #| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows. The alpha level (transparency) indicates whether the participant is part of the per-protocol (PP) or modified intention-to-treat (mITT) population."
 #| eval: true
 
-g_trajectories + theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
-
-
+g_trajectories 
 
 ```
 

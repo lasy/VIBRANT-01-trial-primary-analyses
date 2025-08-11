@@ -6,3 +6,6 @@
 *.Rproj
 .DS_Store
 99-purgatory.qmd
+*.RData
+*.rdb
+*.rdx

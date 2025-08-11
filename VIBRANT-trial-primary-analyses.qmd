@@ -11,7 +11,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: true # true refresh false
+  cache: refresh # true refresh false
   warning: false
 knitr:
   opts_chunk:
@@ -35,6 +35,7 @@ library(labelled)
 library(scales)
 # library(gridExtra)
 library(ggpubr)
+library(ggh4x)
 # library(mia) # BiocManager::install("mia")
 
 theme_set(theme_light())
@@ -106,3 +107,31 @@ fs::dir_ls(str_c(data_dir(), "01 Preprocessed and QCed/"), regexp = "exposures_.
 ```{r 04-supplementary, child = '04-supplementary-analyses.qmd'}
 #| eval: true
 ```
+
+
+## Figures
+
+```{r}
+
+ggsave(
+  g_trajectories, filename = "figures/trajectories_plot.pdf",
+  width = 12, height = 7.5, dpi = 300, units = "in"
+)
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 12
+
+# figure 3
+
+g_prop_colonized_by +
+g_petit_nom +
+plot_layout(ncol = 2, widths = c(2, 1)) +
+plot_annotation(tag_level = "A")
+
+```
+
+
