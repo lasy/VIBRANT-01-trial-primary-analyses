@@ -55,7 +55,7 @@ total_rel_ab_of_LBP <-
   total_rel_ab_of_LBP |> 
   left_join(
     total_rel_ab_of_LBP |> 
-      select(pid, arm, site) |> 
+      dplyr::select(pid, arm, site) |> 
       distinct() |> 
       group_by(arm, site) |> 
       arrange(pid) |> 
@@ -143,10 +143,10 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
       aes(x = study_week, y = prop_who_colonized_at, col = arm) +
       facet_grid(site ~ .) +
       geom_ribbon(
-        aes(ymin = CI_low, ymax = CI_high, fill = arm), 
-        alpha = 0.1, color = NA
+        aes(ymin = CI_low, ymax = CI_high, fill = arm, colour = arm), 
+        alpha = 0.05, size = 0.2 #, color = NA
       ) +
-      geom_line(linewidth = 0.75) +
+      geom_line(linewidth = 0.75) + #size = 0.35
       geom_point(size = 1.5) + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
@@ -154,8 +154,28 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         breaks = seq(0, 1, by = 0.2)
       )  +
       expand_limits(y = 0) +
-      scale_color_manual("Arm", values = arm_colors) +
-      scale_fill_manual("Arm", values = arm_colors) 
+          scale_color_manual(
+      "Arm",
+      values = c(
+        "LC-106-7" = "#F37122",
+        "LC-115"   = "#8E2708",
+        "LC-106-3" = "dodgerblue1",
+        "LC-106-o" = "#D068A1",
+        "Pl"       = "#B3B3B3"
+      )
+    ) +
+    scale_fill_manual(
+      "Arm",
+      values = c(
+        "LC-106-7" = "#E69F00", #  - E5E750
+        "LC-115"   = "#9D2906",
+        "LC-106-3" = "dodgerblue1", # #56B4E9
+        "LC-106-o" = "#CC79A7", # #CC79A7
+        "Pl"       = "grey90"
+      )
+    )
+      #scale_color_manual("Arm", values = arm_colors) +
+      #scale_fill_manual("Arm", values = arm_colors) 
   }
 
 
@@ -164,9 +184,11 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
 
 
 ```{r}
+#| fig-height: 7.5
+#| fig-width: 12
 
-g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
-g_prop_colonized_by + ggtitle(fig_title) 
+g_prop_colonized_by_final <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
+g_prop_colonized_by_final # + ggtitle(fig_title) 
 
 ```
 
@@ -271,7 +293,7 @@ total_rel_ab_of_Lc <-
   total_rel_ab_of_Lc |> 
   left_join(
     total_rel_ab_of_Lc |> 
-      select(pid, arm, site) |> 
+      dplyr::select(pid, arm, site) |> 
       distinct() |> 
       group_by(arm, site) |> 
       arrange(pid) |> 
@@ -359,10 +381,10 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
       aes(x = study_week, y = prop_who_colonized_at, col = arm) +
       facet_grid(site ~ .) +
       geom_ribbon(
-        aes(ymin = CI_low, ymax = CI_high, fill = arm), 
-        alpha = 0.1, color = NA
+        aes(ymin = CI_low, ymax = CI_high, fill = arm, colour = arm), 
+        alpha = 0.05, size = 0.2 #, color = NA
       ) +
-      geom_line() +
+      geom_line(size = 0.35) +
       geom_point() + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
@@ -370,8 +392,26 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         breaks = seq(0, 1, by = 0.2)
       )  +
       expand_limits(y = 0) +
-      scale_color_manual("Arm", values = arm_colors) +
-      scale_fill_manual("Arm", values = arm_colors) 
+    scale_color_manual(
+      "Arm",
+      values = c(
+        "LC-106-7" = "#F37122",
+        "LC-115"   = "#8E2708",
+        "LC-106-3" = "dodgerblue1",
+        "LC-106-o" = "#D068A1",
+        "Pl"       = "#B3B3B3"
+      )
+    ) +
+    scale_fill_manual(
+      "Arm",
+      values = c(
+        "LC-106-7" = "#E69F00", #  - E5E750
+        "LC-115"   = "#9D2906",
+        "LC-106-3" = "dodgerblue1", # #56B4E9
+        "LC-106-o" = "#CC79A7", # #CC79A7
+        "Pl"       = "grey90"
+      )
+    )
   }
 
 
@@ -381,7 +421,7 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
 ```{r}
 
 g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_Lc)
-g_prop_colonized_by + ggtitle(fig_title)
+g_prop_colonized_by # + ggtitle(fig_title)
 
 ```
 
@@ -474,7 +514,7 @@ Longitudinal stack relative abundances plot:
 rel_abs <- 
   mae[["mg"]] |> 
   as_tibble() |> 
-  select(
+  dplyr::select(
     .feature, .sample, uid, rel_ab, poor_quality_mg_data,
     taxon_label, genus, LBP, strain_origin
     ) 
@@ -523,16 +563,11 @@ rel_abs_agg <-
 tmp <- 
   rel_abs_agg |> 
   mutate(pid_label = ifelse(PP, "", ifelse(mITT, "*", ""))) |> 
-  select(pid, pid_label) |> 
+  dplyr::select(pid, pid_label) |> 
   distinct() 
 pid_label <- setNames(tmp$pid_label, tmp$pid)
 
-# strip_background <- ggh4x::strip_themed(
-#   text_x = ggh4x::elem_list_text(colour = "black"),
-#   background_x = ggh4x::elem_list_rect(fill = ifelse(levels(level3_long$cluster) == "1", "green",
-#                                               ifelse(levels(level3_long$cluster) == "2", "red", "blue")))
-# )
-#   
+ 
 g_trajectories <-
   rel_abs_agg |>
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
@@ -580,13 +615,16 @@ g_trajectories <-
   ) +
   scale_x_discrete("Participants", labels = pid_label) +
   theme(
-    strip.background.y = element_rect(fill = "gray90"),
-    strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    #strip.background.y = element_rect(fill = "gray90"),
+    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
     strip.text.x = element_text(hjust = 0.5),
     axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 15, margin = margin(t = -1)), 
     axis.ticks.x = element_blank(),
     legend.key.height = unit(15, "pt")
-  )  # theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+  )  
+
+
+# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
 
 
 
@@ -621,14 +659,14 @@ mae[["amplicon"]] |>
   as_tibble() |> 
   dplyr::left_join(mae@colData |> as_tibble()) |> 
   filter(pid == "068100062", study_week == 5) |> 
-  select(.feature, .sample, rel_ab, exclude_sample)
+  dplyr::select(.feature, .sample, rel_ab, exclude_sample)
 
 
 mae[["amplicon"]] |> 
   as_tibble() |> 
   dplyr::left_join(mae@colData |> as_tibble()) |> 
   filter(pid == "068100062", .feature == "Lactobacillus_crispatus") |> 
-  select(.feature, .sample, visit_code, rel_ab, exclude_sample)
+  dplyr::select(.feature, .sample, visit_code, rel_ab, exclude_sample)
 
 ```
 
@@ -643,19 +681,22 @@ LBP_strains <-
   mae[["mg"]] |> 
   as_tibble() |> 
   filter(!is.na(LBP)) |> 
-  select(.feature, .sample, uid, rel_ab, LBP, strain_origin, poor_quality_mg_data) |> 
+  dplyr::select(.feature, .sample, uid, rel_ab, LBP, strain_origin, poor_quality_mg_data) |> 
   left_join(mae |> colData() |> as_tibble()) |> 
   filter(mITT, !poor_quality_mg_data, randomized)
   
 ```
 
 ```{r}
-#| fig-height: 6
-#| fig-width: 8
+#| fig-height: 7.5
+#| fig-width: 12
+
+
+# visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric())
 
 LBP_strains |> 
    mutate(
-    visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric()),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
     ) |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
@@ -664,7 +705,11 @@ LBP_strains |>
   # geom_violin(col = NA, alpha = 0.4) + # > TODO: check if it looks good - IT DOES NOT!
   ggbeeswarm::geom_quasirandom(alpha = 0.5, size = 0.5, dodge.width = 0.5) +
   # geom_boxplot(outlier.size = 0.5) +
-  facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  # facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(LBP, strain_origin),
+    scales = "free_x", space = "free_x") + 
   xlab("LBP strain") +
   scale_y_continuous(
     "Relative abundance", labels = scales::percent,
@@ -677,14 +722,22 @@ LBP_strains |>
   ) 
 
 
-LBP_strains |> 
+g_relative_abundance <- 
+  LBP_strains |> 
+  mutate(
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |>
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
   aes(x = .feature, y = rel_ab, col = site, fill = site) +
   # geom_point(alpha = 0.5, size = 0.5) +
   geom_boxplot(outlier.size = 0.5, alpha = 0.4) +
-  facet_grid(study_week ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
-  xlab("LBP strain") +
+  #facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(LBP, strain_origin),
+    scales = "free_x", space = "free_x") +
+  xlab("") +
   scale_y_continuous(
     "Relative abundance bacteria", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
@@ -692,15 +745,16 @@ LBP_strains |>
   scale_color_manual(values = site_colors) +
   scale_fill_manual(values = site_colors) +
   theme(
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    axis.text.x = element_text(angle = 45, hjust = 1)
   ) 
+g_relative_abundance
   
 ```
 
 
 ```{r}
-#| fig-width: 15
-#| fig-height: 5
+#| fig-width: 12
+#| fig-height: 6
 
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
@@ -733,10 +787,10 @@ tmp <-
   mae[["mg"]] |> 
   as_tibble() |> 
   filter(!is.na(LBP), !poor_quality_mg_data) |> 
-  select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
+  dplyr::select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
   # add the arm, mITT, etc.
   left_join(
-    mae |> colData() |> as_tibble() |> select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
+    mae |> colData() |> as_tibble() |> dplyr::select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
     by = join_by(uid)
   ) |>
   # only consider the mITT
@@ -776,13 +830,17 @@ tmp <-
 ```
 
 ```{r}
-#| fig-width: 8
-#| fig-height: 4
+#| fig-width: 12
+#| fig-height: 6
 
-tmp |> 
+g_colonized_among_exposed <- 
+  tmp |> 
   ggplot() +
   aes(x = .feature, y = prop_colonized, col = site) +
-  facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
+  #facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
+   ggh4x::facet_nested(
+    cols = vars(LBP, strain_origin),
+    scales = "free_x", space = "free_x") +
   geom_errorbar(
     aes(ymin = CI_low, ymax = CI_high), 
     linewidth = 1, alpha = 0.7,
@@ -790,7 +848,7 @@ tmp |>
     ) +
   geom_point(position = position_dodge(width = 0.5), size = 2) +
   scale_color_manual("Study site", values = site_colors) +
-  xlab("LBP strain") + 
+  xlab("") + 
   ylab("Proportion of participants colonized\namong those exposed") +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
@@ -819,7 +877,7 @@ tmp |>
       ),
     strain_info = str_c(LBP, "<br>(", strain_origin, " strains)")
   ) |> 
-  select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
+  dplyr::select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
   pivot_wider(
     names_from = c(site), 
     values_from = value
@@ -849,11 +907,11 @@ tmp <-
   mae[["mg"]] |> 
   as_tibble() |> 
   filter(!is.na(LBP), !poor_quality_mg_data) |> 
-  select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
+  dplyr::select(.feature, LBP, strain_origin, .sample, uid, rel_ab) |> 
   # add the arm, mITT, etc.
   left_join(
     mae |> colData() |> as_tibble() |> 
-      select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
+      dplyr::select(uid, pid, site, randomized, mITT, arm, visit_code, visit, PIPV), 
     by = join_by(uid)
   ) |>
   # only consider the mITT
@@ -901,8 +959,8 @@ tmp <-
 ```
 
 ```{r}
-#| fig-width: 8
-#| fig-height: 4
+#| fig-width: 12
+#| fig-height: 6
 
 tmp |> 
   ggplot() +
@@ -943,7 +1001,7 @@ tmp |>
       ),
     strain_info = str_c(LBP, "<br>(", strain_origin, " strains)")
   ) |> 
-  select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
+  dplyr::select(-n_exposed, -n_colonized, -prop_colonized, -CI_low, -CI_high, -CI, -LBP, -strain_origin) |> 
   pivot_wider(
     names_from = c(site), 
     values_from = value

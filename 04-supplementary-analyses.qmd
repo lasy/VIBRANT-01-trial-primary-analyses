@@ -31,14 +31,14 @@ Among participants colonized by week 5, how many are still colonized at week 12?
 
 col_by_week5 <- 
   mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
   distinct() |> 
   filter(randomized, mITT) |> 
   left_join(
     mae[["col_LBP_mg"]] |> 
       as_tibble() |> 
       dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
         by = join_by(.sample == uid)
       ) |> 
       dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
@@ -48,14 +48,14 @@ col_by_week5 <-
 
 col_at_week12 <- 
   mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
   distinct() |> 
   filter(randomized, mITT) |> 
   left_join(
     mae[["col_LBP_mg"]] |> 
       as_tibble() |> 
       dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
         by = join_by(.sample == uid)
       ) |> 
       dplyr::filter(visit_code == "2120", .feature == "colonized_LBP_at_mg")
@@ -65,9 +65,9 @@ col_at_week12 <-
 
 col_still_col <- 
   col_by_week5 |> 
-  select(pid, site, arm, randomized, ITT, mITT, PP, LBP_colonization_by_week5) |> 
+  dplyr::select(pid, site, arm, randomized, ITT, mITT, PP, LBP_colonization_by_week5) |> 
   left_join(
-    col_at_week12 |> select(pid, LBP_colonization_at_week12 ),
+    col_at_week12 |> dplyr::select(pid, LBP_colonization_at_week12 ),
     by = c("pid")
   )
 
@@ -347,23 +347,29 @@ summary_col_still_col <-
 Plot (Figure 3b)
 
 ```{r}
+#| fig-height: 7.5
+#| fig-width: 12
 
-g_petit_nom <- 
-summary_col_still_col |> 
-  ggplot() +
-  aes(x = arm, y = p_col_stil_col, col = site) +
-  geom_linerange(
-    aes(ymin = CI$lower, ymax = CI$upper), 
-    linewidth = 2, alpha = 0.5, lineend = "round",
-    width = 0.3, position = position_dodge(width = 0.35)
-    ) +
-  geom_point(position = position_dodge(width = 0.35), size = 4) +
-  scale_color_manual("Study site", values = site_colors) +
-  xlab("") + 
-  ylab("Proportion of participants colonized by week 5\nwith LBP strain detected at week 12") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+g_long_terme_col <- 
+  summary_col_still_col |> 
+    ggplot() +
+    aes(x = arm, y = p_col_stil_col, col = site) +
+    geom_linerange(
+      aes(ymin = CI$lower, ymax = CI$upper), 
+      linewidth = 2, alpha = 0.5, lineend = "round",
+      width = 0.3, position = position_dodge(width = 0.5), 
+      show.legend = FALSE
+      ) +
+    geom_point(position = position_dodge(width = 0.5), size = 3) +
+    scale_color_manual("Study site", values = site_colors) +
+    xlab("") + 
+    ylab("Proportion of participants colonized \nby week 5 with LBP strain detected \nat week 12") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
-g_petit_nom
+g_long_terme_col
 
 ```
 

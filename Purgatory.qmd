@@ -4,6 +4,47 @@ format: html
 editor: visual
 ---
 
+# 03 secondary outcomes
+
+### 08/08 Microbiota trajectory
+
+```{r}
+g_trajectories <-
+  rel_abs_agg |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric()),
+    ) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon, alpha = ifelse(PP, "PP", "mITT"))) +
+  geom_col() +
+  facet_grid(visit_label ~ arm + site, scales = "free", space = "free") +
+  scale_fill_manual(
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  scale_y_continuous(
+    "relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants") +
+  theme(
+    strip.text.y = element_text(angle = 0, hjust = 0),
+    strip.text.x = element_text(angle = 90, hjust = 0),
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+  )
+```
+
+
 # 04 - supplementary analyses
 
 

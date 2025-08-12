@@ -38,7 +38,7 @@ library(ggpubr)
 library(ggh4x)
 # library(mia) # BiocManager::install("mia")
 
-theme_set(theme_light())
+#theme_set(theme_light())
 tmp <- fs::dir_map("R", source)
 rm(tmp)
 
@@ -114,7 +114,7 @@ fs::dir_ls(str_c(data_dir(), "01 Preprocessed and QCed/"), regexp = "exposures_.
 ```{r}
 
 ggsave(
-  g_trajectories, filename = "figures/trajectories_plot.pdf",
+  g_trajectories, filename = "figures/Figure2_trajectories_plot.pdf",
   width = 12, height = 7.5, dpi = 300, units = "in"
 )
 
@@ -127,11 +127,45 @@ ggsave(
 
 # figure 3
 
-g_prop_colonized_by +
-g_petit_nom +
-plot_layout(ncol = 2, widths = c(2, 1)) +
-plot_annotation(tag_level = "A")
+figure3 <- 
+  g_prop_colonized_by_final +
+  g_long_terme_col +
+  plot_layout(ncol = 2, widths = c(1.5, 1)) +
+  plot_annotation(tag_level = "A") 
+
+ggsave(
+  figure3, filename = "figures/Figure3_colonization.pdf",
+  width = 12, height = 5, dpi = 300, units = "in"
+)
 
 ```
 
+
+```{r}
+#| fig-height: 4
+#| fig-width: 12
+
+# figure 4 
+ggsave(
+  g_relative_abundance, filename = "figures/Figure4_relative_abundance.pdf",
+  width = 12, height = 7.5, dpi = 300, units = "in"
+)
+
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 12
+
+# figure 5 
+ggsave(
+  g_colonized_among_exposed, filename = "figures/Figure5_colonized_among_exposed.pdf",
+  width = 12, height = 7.5, dpi = 300, units = "in"
+)
+
+
+
+```
 
