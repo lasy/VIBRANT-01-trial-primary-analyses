@@ -73,21 +73,63 @@ col_still_col <-
 
 ```
 
-#### All arms 
 
-##### By site and arm
 
 ```{r}
 
 summary_col_still_col <-
-  col_still_col |> 
-  filter(LBP_colonization_by_week5) |>
-  group_by(site, arm) |> 
-  summarize(
-    n = n(),  # total with colonization at week 5
-    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-    .groups = "drop"
+  bind_rows(
+    # by site and arms
+    col_still_col |> 
+      filter(LBP_colonization_by_week5) |>
+      group_by(site, arm) |> 
+      summarize(
+        n = n(),  # total with colonization at week 5
+        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+        .groups = "drop"
+      ),
+    # combining sites, by arm
+    col_still_col |> 
+      filter(LBP_colonization_by_week5) |>
+      group_by(arm) |> 
+      summarize(
+        n = n(),  # total with colonization at week 5
+        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+        .groups = "drop"
+      ) |> 
+      mutate(site = "CAP & MGH")
   ) |> 
+  mutate(
+    site = site |> fct_inorder(),
+    arm = arm |> fct_expand("All arms", "All active arms")
+    )
+
+summary_col_still_col <- 
+  summary_col_still_col |> 
+  bind_rows(
+    # overall by site, all arms
+    summary_col_still_col |> 
+      group_by(site) |> 
+      summarize(
+        n = sum(n),  # total with colonization at week 5
+        n_success = sum(n_success),  # still colonized at week 12
+        .groups = "drop"
+      ) |> 
+      mutate(arm = "All arms" |> factor(levels = summary_col_still_col$arm |> levels())),
+    # overall by site, all active arms
+    summary_col_still_col |>
+      filter(arm != "Pl") |>
+      group_by(site) |> 
+      summarize(
+        n = sum(n),  # total with colonization at week 5
+        n_success = sum(n_success),  # still colonized at week 12
+        .groups = "drop"
+      )  |> 
+      mutate(arm = "All active arms" |> factor(levels = summary_col_still_col$arm |> levels()))
+  )
+
+summary_col_still_col <- 
+  summary_col_still_col |> 
   mutate(
     p_col_stil_col = n_success / n,
     CI = binom::binom.confint(n_success, n, method = "exact")
@@ -95,505 +137,128 @@ summary_col_still_col <-
 
 ```
 
+
+```{r}
+
+table_still_col <- 
+  summary_col_still_col |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |>
+  arrange(arm) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    ) |> 
+  arrange(site)
+
+```
+
+```{r}
+
+table_still_col |> 
+  group_by(site) |> 
+  gt(
+    caption = "Colonization at week 12 among participants colonized by week 5 by arm", 
+    row_group_as_column = TRUE
+    ) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_align(
+    align = "center", 
+    columns = c(Pl, `LC-106-7`, `LC-106-3`, `LC-106-o`, `LC-115`, `All arms`, `All active arms`)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    `All active arms` = "All active<br>arms",
+    .fn = md
+  )
+
+```
+
+
+
+
 Plot (Figure 3b)
 
 ```{r}
+#| fig-width: 6
+#| fig-height: 4
 
 summary_col_still_col |> 
+  filter(!(arm %in% c("Pl", "All arms"))) |> 
+  arrange(arm) |> 
+  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
   ggplot() +
   aes(x = arm, y = p_col_stil_col, col = site) +
-  geom_errorbar(
+  geom_linerange(
     aes(ymin = CI$lower, ymax = CI$upper), 
-    linewidth = 1, alpha = 0.7,
-    width = 0.3, position = position_dodge(width = 0.5)
+    linewidth = 1.5, alpha = 0.5, lineend = "round",
+    position = position_dodge(width = 0.5)
     ) +
-  geom_point(position = position_dodge(width = 0.5), size = 2) +
-  scale_color_manual("Study site", values = site_colors) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  scale_color_manual("Study site", values = c(site_colors, c("CAP & MGH" = "gray30"))) +
   xlab("") + 
-  ylab("Proportion of participants colonized by week 5\nwith LBP strain detected at week 12") +
+  scale_y_continuous(
+    name = "% participants colonized by week 5\nwith LBP strain detected at week 12",
+    labels = scales::percent_format(accuracy = 1)
+  ) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    panel.grid.major.x = element_blank()
+    # axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 ```
 
 
-Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
-
-```{r}
-
-table_still_col <- 
-  summary_col_still_col |> 
-  mutate(
-    N_per_site_and_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(site, arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(site, name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  group_by(site) |> 
-  gt(caption = "Colonization at week 12 among\nparticipant colonized by week 5 by arm and site", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    # Blinded = "All blinded arms",
-    Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
-
-##### By arm
-
-```{r}
-
-summary_table_still_col <-
-  col_still_col |> 
-  filter(LBP_colonization_by_week5) |>
-  group_by(arm) |> 
-  summarize(
-    n = n(),  # total with colonization at week 5
-    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-    .groups = "drop"
-  ) |> 
-  mutate(
-    p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  )
-
-table_still_col <- 
-  summary_table_still_col |> 
-  mutate(
-    N_per_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    arm, N_per_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    # Blinded = "All blinded arms",
-    Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
-
-
-##### Overall
-
-Overall colonization at week 12 among participants colonized by week 5
-
-```{r}
-#| eval: false
-
-col_still_col |> 
-  filter(LBP_colonization_by_week5) |> 
-  summarise(
-    n = n(),
-    n_success = sum(LBP_colonization_at_week12),
-    p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  ) |> 
-  mutate(
-    pct = round(p * 100, 1),
-    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
-  ) |> 
-  select(n, n_success, pct, CI_text) |> 
-  gt(caption = "Colonization in all arms", row_group_as_column = TRUE) |> 
-  cols_label(
-    n = "N participants colonized by week 5",
-    n_success = "n (%) participants still colonized at week 12",
-    pct = "Percentage (n/N)",
-    CI_text = "95% CI"
-  )
-
-```
-
-By arm & overall 
-
-```{r}
-
-table_still_col <- 
-  summary_table_still_col |> 
-  bind_rows(
-    tibble(
-      arm = "Total", 
-      n = sum(summary_table_still_col$n), 
-      n_success = sum(summary_table_still_col$n_success), 
-      p = n_success/n, 
-      CI = binom::binom.confint(n_success, n, method = "exact")
-    )
-  ) |> 
-  mutate(
-    N_per_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    arm, N_per_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants still colonized at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    # Blinded = "All blinded arms",
-    Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
-
-
-#### Active arms 
-
-##### By site and arm
-
-```{r}
-
-summary_col_still_col <-
-  col_still_col |> 
-  filter(LBP_colonization_by_week5) |>
-  filter(arm != "Pl") |> 
-  group_by(site, arm) |> 
-  summarize(
-    n = n(),  # total with colonization at week 5
-    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-    .groups = "drop"
-  ) |> 
-  mutate(
-    p_col_stil_col = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  )
-
-```
-
-Plot (Figure 3b)
-
-```{r}
-#| fig-height: 7.5
-#| fig-width: 12
-
-g_long_terme_col <- 
-  summary_col_still_col |> 
-    ggplot() +
-    aes(x = arm, y = p_col_stil_col, col = site) +
-    geom_linerange(
-      aes(ymin = CI$lower, ymax = CI$upper), 
-      linewidth = 2, alpha = 0.5, lineend = "round",
-      width = 0.3, position = position_dodge(width = 0.5), 
-      show.legend = FALSE
-      ) +
-    geom_point(position = position_dodge(width = 0.5), size = 3) +
-    scale_color_manual("Study site", values = site_colors) +
-    xlab("") + 
-    ylab("Proportion of participants colonized \nby week 5 with LBP strain detected \nat week 12") +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + 
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-
-g_long_terme_col
-
-```
-
-
-Table of colonization at week 12 among participants colonized by week 5 (by site and arm)
-
-```{r}
-
-table_still_col <- 
-  summary_col_still_col |> 
-  mutate(
-    N_per_site_and_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(site, arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(site, name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  group_by(site) |> 
-  gt(caption = "Colonization at week 12 among\nparticipant colonized by week 5 by arm and site", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
-
-##### By arm
-
-```{r}
-
-summary_table_still_col <-
-  col_still_col |> 
-  filter(LBP_colonization_by_week5) |>
-  group_by(arm) |> 
-  summarize(
-    n = n(),  # total with colonization at week 5
-    n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-    .groups = "drop"
-  ) |> 
-  mutate(
-    p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  )
-
-table_still_col <- 
-  summary_table_still_col |> 
-  mutate(
-    N_per_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    arm, N_per_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
-
-##### Overall 
-
-Overall colonization at week 12 among participants colonized by week 5
-
-```{r}
-#| eval: false
-
-col_still_col |> 
-  filter( arm != "Pl") |> 
-  filter(LBP_colonization_by_week5) |> 
-  summarise(
-    n = n(),
-    n_success = sum(LBP_colonization_at_week12),
-    p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  ) |> 
-  mutate(
-    pct = round(p * 100, 1),
-    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
-  ) |> 
-  select(n, n_success, pct, CI_text) |> 
-  gt(caption = "Colonization in active arms") |> 
-  cols_label(
-    n = "N participants \n colonized by week 5",
-    n_success = "n (%) participants still colonized at week 12",
-    pct = "Percentage",
-    CI_text = "95% CI"
-  )
-
-```
-
-
-By arm & overall 
-
-```{r}
-
-tmp <- 
-  summary_table_still_col |> 
-  filter(arm != "Pl")
-
-table_still_col <- 
-  tmp |> 
-  filter(arm != "Pl") |> 
-  bind_rows(
-    tibble(
-      arm = "Total", 
-      n = sum(tmp$n), 
-      n_success = sum(tmp$n_success), 
-      p = n_success/n, 
-      CI = binom::binom.confint(n_success, n, method = "exact")
-    )
-  ) |> 
-  mutate(
-    N_per_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    arm, N_per_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants still colonized at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |> 
-  pivot_wider(
-    id_cols = c(name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    )
-
-
-table_still_col |> 
-  gt(caption = "Colonization at week 12 among participant colonized by week 5 by arm", row_group_as_column = TRUE) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_label(
-    name = "",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    .fn = md
-  )
-
-```
 
 ### Applicator staining
 
-#### Load data
+#### Data used for analysis
 
-We load data on stained applicators from CRF46 and data on returned applicators from CRF23. We also load the exposures table to obtain information on study product use. Then, we create the `applicator` table, which includes only participants from the mITT population.
+We load data on returned applicators from CRF23 and on staining results from CRF 46. 
+We also load the `exposures` table to obtain information on study product use. 
+
+From these three tables, we create the `applicator` table, which includes only participants from the mITT population.
 
 ```{r}
+
+applicator_returned <- 
+  metadata(mae)$crf_data_clean$crf23 |> 
+  as_tibble() |> 
+  select(uid, pid, visit_code, study_day, used_applicators, number_applicators) |> 
+  dplyr::rename(
+    returned_used_applicators = used_applicators,
+    number_of_returned_applicators = number_applicators
+  )
 
 applicator_stained <- 
   metadata(mae)$crf_data_clean$crf46 |> 
   as_tibble() |> 
   select(-dfseq, -vdate_fixed)
 
-applicator_returned <- 
-  metadata(mae)$crf_data_clean$crf23 |> 
-  as_tibble() |> 
-  select(uid, pid, visit_code, study_day, used_applicators, number_applicators) |> 
-  group_by(pid)
 
 study_product <- 
   mae@colData |> 
@@ -606,516 +271,271 @@ study_product <-
     by = "pid"
   ) |>
   group_by(pid) |>
-  mutate(
-    n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE)
-  ) |> 
-  ungroup() |> 
-  distinct(pid, n_product_doses, comments_studyproduct)
+  summarize(
+    n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE),
+    n_product_doses_PP = sum(study_product_PP, na.rm = TRUE),
+    comments_studyproduct = str_c(comments_studyproduct[!is.na(comments_studyproduct)], collapse = "; "),
+    .groups = "drop"
+  ) 
 
 applicator <-
   mae@colData |> as_tibble() |>
   select(pid, site, randomized, arm, ITT, mITT, PP) |>
   distinct() |>
-  filter(randomized, mITT)|>
+  filter(randomized, mITT) |>
   left_join(applicator_returned, by = c("pid")) |>
   left_join(
-    applicator_stained,
+    applicator_stained |> select(-ends_with("_control")),
     by = c("uid", "pid", "visit_code", "study_day")
   ) |>
-  left_join(study_product, by = "pid")
+  left_join(study_product, by = "pid") 
 
 ```
 
-Some participants returned applicators at two different visits. According to the CAPRISA Vulindlela Pharmacy, used and remaining applicators, along with the study product, were given back to participants after the first visit, and they were expected to return all applicators at the second visit. For this reason, when applicators were returned at both visits, we kept only the data from the second visit.
-
-Two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
-
-*   Participant 068-20-0425 reported taking the spare applicator out of its wrapping and placing it in the return bag without using or washing any applicators.
-*   Participant 068-20-0439 reported inserting the spare applicator on the day of the visit, thinking all applicators had to be used, but also did not wash any of them.
 
 
 ```{r}
-#| fig-height: 8
-#| fig-width: 6
+#| fig-height: 5
+#| fig-width: 13
 
 applicator |> 
-  ggplot(aes(x = visit_code, y = pid, fill = number_applicators |> as.factor())) +
+  ggplot() +
+  aes(x = pid, y = visit_code, fill = number_of_returned_applicators |> as.factor()) +
+  facet_grid(. ~ arm, scales = "free", space = "free") +
   geom_tile() + 
-  geom_text(aes(label = applicator_stain_positive), color = "black", size = 2) +   
+  # geom_text(aes(label = str_c(applicator_stain_positive, "/", number_of_returned_applicators)), color = "black", size = 2) +  
   scale_fill_manual( 
     name = "Number of applicators \nreturned",
     values = c(
-    "3" = "lightblue3", 
-    "4" = "lightblue", 
-    "5" = "lightblue1", 
-    "6" = "lightgreen", 
-    "7" = "green3", 
-    "8" = "darkgreen"
+    "3" = "pink4", 
+    "4" = "pink3", 
+    "5" = "pink1", 
+    "6" = "seagreen2", 
+    "7" = "seagreen3", 
+    "8" = "seagreen4"
     ), 
     na.translate = FALSE) +
   labs(
-    x = "Visit code",
-    y = "Participant ID",
-    title = "Number of applicator returned (out of number applicator stained positive)")  + 
-  theme(axis.text.y = element_text(size = 6))
+    x = "Participant ID",
+    y = "Visit code",
+    # caption = "Text:\npositive applicators by staining / total number of applicators returned"
+    )  + 
+  theme(
+    axis.text.x = element_blank()
+    )
 
 ```
 
+Some participants (mostly from the overlapping arm) returned applicators at two different visits. 
+
+According to the CAPRISA Vulindlela Pharmacy, when participants came to the clinic with an incomplete set of used applicators or still had to take additional study product doses, data about number of used applicator returned was reported in the CRFs, but the applicators were given back to participants who were requested/expected to return all applicators at the following visit once study product use was over. Based on these explanations, when applicators were returned at two visits, we keep only the data from the second visit.
 
 ```{r}
+
 applicator <- 
   applicator |>
   group_by(pid) |>
   mutate(
-    data_complete = !is.na(number_applicators) | !is.na(applicator_stain_positive)
+    data_complete = !is.na(number_of_returned_applicators) | !is.na(applicator_stain_positive)
   ) |>
   arrange(pid, desc(data_complete), desc(visit_code)) |>
   dplyr::slice(1) |> 
   ungroup()
+
 ```
 
 
+We also note that two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
 
-#### Numbers
+*   Participant 068-20-0425 reported taking the spare applicator out of its wrapping and placing it in the return bag without using or washing any applicators.
 
->Done for mITT, is it ok ?
+*   Participant 068-20-0439 reported inserting the spare applicator on the day of the visit, thinking all applicators had to be used, but also did not wash any of them.
 
-- Proportion of participants that returned applicators (0.933)
-- Proportion of participants with returned applicators for which the staining analysis was done (0.988)
+
+
+#### Returned applicator statistics
+
+Here, we want to document the proportions of mITT participants who
+
+- returned any used applicators
+
+- returned their complete set of applicators (*i.e.,* 7 or 8 applicators)
+
+```{r}
+
+applicator <- 
+  applicator |> 
+  mutate(
+    returned_complete_set = (number_of_returned_applicators >= 7),
+    return_category = case_when(
+      (returned_used_applicators == "Yes") & returned_complete_set ~ "Returned complete set",
+      (returned_used_applicators == "Yes") & !returned_complete_set ~ "Returned incomplete set",
+      returned_used_applicators == "No" ~ "Did not return applicators",
+      TRUE ~ "Missing"
+    ) |> fct_infreq()
+  ) 
+
+applicator |> 
+  dplyr::count(return_category) |> 
+  mutate(`%` = round(n / sum(n), 3) * 100) |> 
+  gt() |> 
+  cols_label(category = "")
+
+```
+
+#### Staining statistics
+
+Here, we want to document, for those who returned their complete set of applicators, how many got their full set stained.
+
+```{r}
+applicator <- 
+  applicator |> 
+  mutate(
+    staining_done_category = 
+      case_when(
+        (number_of_returned_applicators == 0) | is.na(number_of_returned_applicators) ~ "No applicators returned",
+        is.na(total_applicators_stained) ~ "No staining done",
+        total_applicators_stained == number_of_returned_applicators ~ "All returned applicators stained",
+        total_applicators_stained < number_of_returned_applicators ~ "Partial staining",
+        total_applicators_stained > number_of_returned_applicators ~ "???",
+        TRUE ~ "???"
+      )
+  )
+```
+
 
 ```{r}
 
 applicator |> 
-  group_by(pid) |> 
-  summarise(
-    used_applicators_returned = ifelse(any(used_applicators == "Yes", na.rm = TRUE), "Yes", "No"),
-    applicator_stained = ifelse(any(!is.na(total_applicators_stained)), "Yes", "No"),
-    .groups = "drop"
-  )|> 
-  dplyr::count(used_applicators_returned, applicator_stained) |> 
+  dplyr::count(return_category, staining_done_category) |> 
+  group_by(return_category) |>
   mutate(
-    prop = round(n / sum(n), 3)
+    `%` = round(n / sum(n), 3) * 100
+  ) |>
+  gt(row_group_as_column = TRUE)
+
+```
+
+#### Positive staining statistics
+
+Here, we document, for the mITT participants who returned their complete set and got all of their applicators stained, the number of positively stained applicators.
+
+
+```{r}
+
+applicator |> 
+  mutate(
+    positive_staining_category = 
+      ifelse(
+      applicator_stain_positive == total_applicators_stained,
+      "All stained applicators are positive",
+      "Some stained applicators are not positive"
+      )
   ) |> 
-  gt() |> 
+  dplyr::count(return_category, staining_done_category, positive_staining_category) |> 
+  group_by(return_category, staining_done_category) |> 
+  mutate(`%` = round(n / sum(n), 3) * 100) |>
+  gt(row_group_as_column = TRUE) |>
   cols_label(
-    used_applicators_returned = "Used applicators returned",
-    applicator_stained = "Applicator stained",
-    n = "N participants",
-    prop = "Percentage"
+    positive_staining_category = "Staining result"
+  )
+
+```
+
+
+
+
+
+```{r}
+
+applicator |> 
+  filter(
+    return_category == "Returned complete set",
+    staining_done_category == "All returned applicators stained"
+  ) |> 
+  dplyr::count(
+    return_category,
+    proportion_positive_applicators, 
+    str_c(100*proportion_positive_applicators, "%")
+  ) |> 
+  mutate(`%` = round(n / sum(n), 3) * 100) |>
+  select(-proportion_positive_applicators) |> 
+  group_by(return_category) |> 
+  gt(row_group_as_column = TRUE) |> 
+  cols_label(
+    `str_c(100 * proportion_positive_applicators, "%")` = "% of positive applicators"
   )
   
-```
-
-```{r}
-applicator |> 
-  dplyr::count(used_applicators) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt()
-```
-
-
-```{r}
-applicator |> 
-  filter(used_applicators == "Yes") |> 
-  dplyr::count(total_applicators_stained == 0|is.na(total_applicators_stained)) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt()
-  
-```
-
-##### Among those who brought in at leat 7 applicator
-
-::: callout-caution
-The variable `number_applicator` is defined as the number of **used** applicators returned.  
-If a participant brings back 5 used applicators and 2 unused applicators, would the `number_applicator` variable be 5 or 7?  
-Currently, we assume that it will be 7.
-:::
-
-- Proportion of participants that returned applicators (0.933)
-- Proportion of participants with returned applicators for which the staining analysis was done (0.988)
-
-```{r}
-
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  group_by(pid) |> 
-  summarise(
-    used_applicators_returned = ifelse(any(used_applicators == "Yes", na.rm = TRUE), "Yes", "No"),
-    applicator_stained = ifelse(any(!is.na(total_applicators_stained)), "Yes", "No"),
-    .groups = "drop"
-  )|> 
-  dplyr::count(used_applicators_returned, applicator_stained) |> 
-  mutate(
-    prop = round(n / sum(n), 3)
-  ) |> 
-  gt() |> 
-  cols_label(
-    used_applicators_returned = "Used applicators returned",
-    applicator_stained = "Applicator stained",
-    n = "N participants",
-    prop = "Percentage"
-  )
-  
-```
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  dplyr::count(used_applicators) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt()
-```
-
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  filter(used_applicators == "Yes") |> 
-  dplyr::count(total_applicators_stained == 0|is.na(total_applicators_stained)) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt()
-  
-```
-
-#### Staining analysis 
-
-##### mITT 
-
-Concordance between self-reports and applicator staining:
-
-- scatter plot of # of self-reported doses vs # of positive staining
-
-```{r}
-
-applicator |> 
-  mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive) |>
-  ggplot(aes(x = n_product_doses , 
-             y = applicator_stain_positive, 
-             fill = n)) + 
-  geom_tile() +
-  geom_text(aes(label = n), size = 3) +
-  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
-  guides(fill = "none") +
-  xlab("Number of doses taken") +
-  ylab("Positive applicator (n)")
-
-```
-
-```{r}
-
-applicator |> 
-  mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
-  ) |>
-  ggplot(aes(x = n_product_doses, y = applicator_stain_positive, col = n_product_doses |> as.factor())) + 
-  geom_point() + 
-  geom_jitter(width = 0.2, height = 0.2) + 
-  labs(x = "Number of study product doses", 
-       y = "Number of applicator stained positive") + 
-  guides(col = "none")
-```
-
-
-- Number of participants that self-reported using at least one dose (= XX) (90)
-- Number of participants that had at least one positive staining (= YY) (82)
-
-```{r}
-applicator |> 
-  dplyr::count(n_product_doses) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    n_product_doses = "Number of study product doses taken"
-  )
-```
-
-
-```{r}
-applicator |> 
-  dplyr::count(applicator_stain_positive > 1) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    `applicator_stain_positive > 1` = "More than 1 applicator stained positive"
-  )
-```
-
-
-+ contingency table of self-reported doses and positive staining (ok)
-
-- Proportion of participants self-reported using at least one dose **and** have at least one positive staining  (= ZZ/XX) (=82)
-
-```{r}
-applicator |> 
-  dplyr::count((applicator_stain_positive > 1&n_product_doses>1)) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    `(applicator_stain_positive > 1 & n_product_doses > 1)` = "More than 1 applicator stained positive and more than 1 product doses taken"
-  )
-```
-
-###### Among those who brought in at least 7 applicators
-
-Concordance between self-reports and applicator staining:
-
-- scatter plot of # of self-reported doses vs # of positive staining
-
-```{r}
-
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive) |>
-  ggplot(aes(x = n_product_doses |> as.factor(), 
-             y = applicator_stain_positive, 
-             fill = n)) + 
-  geom_tile() +
-  geom_text(aes(label = n), size = 3) +
-  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
-  guides(fill = "none") +
-  xlab("Number of doses taken") +
-  ylab("Positive applicator (n)") + 
-  ggtitle("Among participants who brought in at least 7 applicators")
-
-```
-
-```{r}
-#| eval: false 
-
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing")
-  ) |>
-  ggplot(aes(x = n_product_doses |> as.factor(), 
-             y = applicator_stain_positive, 
-             col = n_product_doses |> as.factor())) + 
-  geom_point() + 
-  geom_jitter(width = 0.2, height = 0.2) + 
-  labs(x = "Number of study product doses", 
-       y = "Number of applicator stained positive") + 
-  guides(col = "none") + 
-  ggtitle("Among participants who brought in at least 7 applicators")
-
-```
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing"), 
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive) |>
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() 
-```
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  mutate(
-    applicator_stain_positive_group = 
-    case_when(
-        applicator_stain_positive >= 7 ~ "100% (>=7)",
-        applicator_stain_positive == 6 ~ "80% (6)", 
-        applicator_stain_positive > 3 & applicator_stain_positive < 6 ~ "50-80% (4-5)", 
-        applicator_stain_positive == 0 ~ "0% (0)", 
-        TRUE ~ "ERROR"
-    ), 
-    applicator_stain_positive_group = factor(
-      applicator_stain_positive_group,
-      levels = c("100% (>=7)", "80% (6)","50-80% (4-5)", "0% (0)")
-    )
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive_group) |>
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() 
-```
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  mutate(
-    applicator_stain_positive_group = 
-    case_when(
-        applicator_stain_positive >= 7 ~ "100% (>=7)",
-        applicator_stain_positive >= 6 ~ ">80% (>=6)", 
-        applicator_stain_positive >= 3 ~ ">50% (>=4)", 
-        applicator_stain_positive == 0 ~ ">0% (>=0)", 
-        TRUE ~ "ERROR"
-    ), 
-    applicator_stain_positive_group = factor(
-      applicator_stain_positive_group,
-      levels = c("100% (>=7)", ">80% (>=6)",">50% (>=4)", ">0% (>=0)")
-    )
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive_group) |>
-  mutate(
-    prop = round(n / sum(n), 3), 
-    prop_cum = cumsum(prop), 
-    n_cum = cumsum(n)) |>
-  select(-n, -prop) |> 
-  gt() 
-```
-
-
-- Number of participants that self-reported using at least one dose (= XX) (90)
-- Number of participants that had at least one positive staining (= YY) (82)
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  dplyr::count(n_product_doses) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    n_product_doses = "Number of study product doses taken"
-  ) |> 
-  tab_header(title = "Among those who brought in at least 7 applicators")
-
-```
-
-
-```{r}
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  dplyr::count(applicator_stain_positive > 1) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    `applicator_stain_positive > 1` = "More than 1 applicator stained positive"
-  ) |> 
-  tab_header(title = "Among those who brought in at least 7 applicators")
-
-```
-
-
-+ contingency table of self-reported doses and positive staining (ok)
-
-- Proportion of participants self-reported using at least one dose **and** have at least one positive staining  (= ZZ/XX) (=82)
-
-```{r}
-
-applicator |> 
-  filter(number_applicators >= 7) |> 
-  dplyr::count((applicator_stain_positive > 1&n_product_doses>1)) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    `(applicator_stain_positive > 1 & n_product_doses > 1)` = "More than 1 applicator stained positive and more than 1 product doses taken"
-  ) |> 
-  tab_header(title = "Among those who brought in at least 7 applicators")
   
 ```
 
 
-##### PP (to check later)
-
--> est ce que je dois filtrer PP avant ? Les resultats ne sont pas les mêmes
-
-Same but with at least 6 doses
-
-Concordance between self-reports and applicator staining:
-
-- scatter plot of # of self-reported doses vs # of positive staining
-
 ```{r}
-
 
 applicator |> 
-filter(PP) |> 
+  filter(
+    return_category == "Returned complete set",
+    staining_done_category == "All returned applicators stained"
+  ) |> 
   mutate(
-    applicator_stain_positive = 
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing"),
-    n_product_doses = n_product_doses |> as.factor()
-  ) |>
-  dplyr::count(n_product_doses, applicator_stain_positive) |>
-  ggplot(aes(x=n_product_doses , 
-             y=applicator_stain_positive, 
-             fill = n)) + 
-  geom_tile() +
-  geom_text(aes(label = n), size = 3) +
-  scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
-  guides(fill = "none") +
-  xlab("Number of doses taken") +
-  ylab("Positive applicator (n)")
-
+    number_of_non_positive_applicators = 
+      total_applicators_stained - applicator_stain_positive
+  ) |> 
+  dplyr::count(
+    return_category, number_of_non_positive_applicators
+  ) |> 
+  mutate(`%` = round(n / sum(n), 3) * 100) |>
+  group_by(return_category) |> 
+  gt(row_group_as_column = TRUE) |> 
+  cols_label(
+    `number_of_non_positive_applicators` = "n non-positive"
+  )
+  
+  
 ```
+
+#### Comparison with declared number of doses taken
 
 ```{r}
 
-
-applicator |>
-  filter(PP) |>
-  mutate(
-    applicator_stain_positive =
-      applicator_stain_positive |> as.factor() |> fct_expand("Missing") |>     replace_na("Missing")
+applicator |> 
+  filter(
+    return_category == "Returned complete set",
+    staining_done_category == "All returned applicators stained"
   ) |>
-  ggplot(
-    aes(
-      x = n_product_doses |> as.factor(),
-      y = applicator_stain_positive,
-      col = n_product_doses |> as.factor()
-  )
+  mutate(
+    applicator_stain_positive_fct = applicator_stain_positive |> as.factor() |> fct_expand("Missing") |> replace_na("Missing"),
+    n_product_doses_fct = n_product_doses |> as.factor()
+  ) |>
+  dplyr::count(
+    n_product_doses, n_product_doses_fct, 
+    applicator_stain_positive, applicator_stain_positive_fct
+    ) |>
+  mutate(
+    label = str_c(n, " (", round(100 * n / sum(n)), "%)") 
+  ) |> 
+  ggplot() + 
+  aes(
+    x = n_product_doses_fct , 
+    y = applicator_stain_positive_fct, 
+    fill = applicator_stain_positive >= n_product_doses,
+    alpha = n
   ) +
-  geom_point() +
-  geom_jitter(width = 0.2, height = 0.2) + 
-  labs(x = "Number of study product doses", 
-       y = "Number of applicator stained positive") + 
-  guides(col = "none")
+  geom_tile() +
+  geom_label(aes(label = label), size = 3) +
+  scale_fill_manual(na.value = "gray70", values = c("tomato", "steelblue2")) +
+  # scale_fill_gradient(low = "lightblue1", high = "lightblue4") +
+  guides(fill = "none", alpha = "none") +
+  xlab("Number of doses taken (self-report)") +
+  ylab("Number of positive applicators") +
+  labs(
+    caption = "Participants who returned their complete set of applicators were included in this analysis"
+  ) 
 
 
 ```
 
-- Number of participants that self-reported using at least six dose (= XX) (85)
-- Number of participants that had at least six positive staining (= YY) (61)
 
-```{r}
-applicator |> 
-  filter(PP) |> 
-  dplyr::count(n_product_doses) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    n_product_doses = "Number of study product taken"
-  )
-```
-
-
-```{r}
-applicator |> 
-  filter(PP) |> 
-  dplyr::count(applicator_stain_positive > 6) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() |> 
-  cols_label(
-    `applicator_stain_positive > 6` = "More than 6 applicator stained positive"
-  )
-```
-
-
-+ contingency table of self-reported doses and positive staining (ok)
-
-- Proportion of participants self-reported using at least six dose **and** have at least six positive staining  (= ZZ/XX) (=59)
-
-```{r}
-applicator |>
-  filter(PP) |> 
-  dplyr::count((applicator_stain_positive > 6&n_product_doses>6)) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() 
-```
 
 ### Time since last dose in 7-days active arms (LC-106-7, LC-115)
 
@@ -1475,6 +895,77 @@ nugent_score |>
   )
 
 ```
+
+### rBV by colonization status
+
+In this section, we are investigating whether LBP colonization is protective of rBV.
+
+So, we only include participants who were BV-cured post-MTZ, then count the number and proportions of participants who had rBV among those who met the primary outcome and those who did not.
+
+
+```{r}
+
+
+rBV_stats <- 
+  # we first define for each mITT participant whether they were BV-cured or not post-MTZ by Nugent
+  nugent_score |> 
+  filter(visit_code == "1100", mITT) |> 
+  select(uid, pid, visit_code, site, mITT, active_arm, arm, nugent_total_score) |> 
+  mutate(BV_cure_post_MTZ = nugent_total_score < 7) |> 
+  # we then specify for each of these participants whether they met the criteria for the primary endpoint of LBP colonization by week 5
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg") |> 
+      mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) |> 
+      select(pid, LBP_colonization_by_week5),
+    by = join_by(pid)
+  ) |> 
+  # we next check who had BV (or rBV) by week 12
+  left_join(
+    nugent_score |> 
+      select(pid, visit_code, nugent_positive) |> 
+      filter(as.numeric(visit_code) > 1100, as.numeric(visit_code) <= 2120) |> 
+      # QUESTION for line above: should it be any time after the post-MTZ visit or anytime between week 5 and 12???
+      group_by(pid) |> 
+      summarize(
+        BV_by_week12 = any(nugent_positive, na.rm = TRUE),
+        BV_after_week5 = any(nugent_positive & as.numeric(visit_code) > 1500, na.rm = TRUE), # any BV after week 5
+        ),
+    by = join_by(pid)
+  ) |> 
+  mutate(
+    rBV_by_week12 = BV_by_week12 & BV_cure_post_MTZ # rBV if BV by week 12 and cured post-MTZ
+  )
+  
+  
+rBV_stats |> filter(active_arm) |> dplyr::count(active_arm, BV_cure_post_MTZ, LBP_colonization_by_week5, BV_by_week12)
+
+```
+
+```{r}
+
+rBV_stats |> 
+  filter(active_arm, BV_cure_post_MTZ) |> 
+  dplyr::count(LBP_colonization_by_week5, BV_by_week12) |> 
+  group_by(LBP_colonization_by_week5) |> 
+  mutate(
+    N = sum(n),
+    `%` = round(n / N, 3) * 100,
+    CI = binom::binom.confint(n, N, method = "exact"),
+    `95% CI` = str_c(round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%")
+  ) |> 
+  select(-CI)
+
+```
+
+
+
+
 
 See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY (16/45) vs. YY/YY (25/48) who did not colonize (p = YY).*"
 
