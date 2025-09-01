@@ -28,4 +28,6 @@ gtsummary
 labelled
 scales
 ggpubr
+ggh4x
+ggthemes
 MultiAssayExperiment

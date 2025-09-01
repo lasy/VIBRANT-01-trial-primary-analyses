@@ -379,7 +379,7 @@ applicator |>
   dplyr::count(return_category) |> 
   mutate(`%` = round(n / sum(n), 3) * 100) |> 
   gt() |> 
-  cols_label(category = "")
+  cols_label(return_category = "")
 
 ```
 

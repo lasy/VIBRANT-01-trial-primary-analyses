@@ -1,0 +1,1041 @@
+---
+title: "daily qPCR"
+author: Laura Symul, Laura Vermeren
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+
+### Daily qPCR data to inform true exposure
+
+
+#### New data (daily home swabs)
+
+
+```{r}
+
+df <- 
+  mae[["qPCR_daily"]] |> 
+  as_tibble() |> 
+  select(uid, .feature, copies_per_swab_med, taxon_label, LBP, strain_origin) |> 
+  left_join(
+    mae@colData |> 
+      as_tibble() |> 
+      select(
+        uid, 
+        pid, 
+        visit_code, PIPV, visit, study_day, 
+        site, randomized, arm, ITT, mITT, PP
+      ),
+    by = join_by(uid)
+  ) |> 
+  arrange(LBP, strain_origin) |>
+  mutate(.feature = .feature |> fct_inorder())
+
+
+```
+
+##### 16S
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+
+
+df |> 
+    filter(.feature == "16S", randomized) |> 
+    ggplot() +
+    aes(x = visit_code, y = pid, fill = copies_per_swab_med |> log10()) +
+    ggh4x::facet_nested(arm + site ~ ., scales = "free", space = "free") +
+    geom_tile() +
+    theme(
+      axis.text = element_text(size = 6),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)
+    )
+
+
+```
+##### LBP strains
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x) |> 
+    ggplot() +
+    aes(x = visit_code, y = .feature, fill = LBP, alpha = copies_per_swab_med |> asinh()) +
+    ggh4x::facet_nested(site + pid ~ ., scales = "free", space = "free") +
+    geom_tile() +
+    scale_alpha_continuous(range = c(0.1, 1), limits = c(-1/2, 20)) +
+    ggtitle(.x) +
+    theme(
+      axis.text = element_text(size = 4),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)
+    )
+)
+
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x) |> 
+    ggplot() +
+    aes(x = visit_code, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+    geom_line(aes(group = .feature)) +
+    geom_point() +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    ggtitle(.x) +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
+)
+
+```
+
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x, study_day >= 0) |> 
+    ggplot() +
+    aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^5, lty = 2, col = "gray40") +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
+    ) +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+    ) +
+    geom_line(aes(group = .feature)) +
+    geom_point() +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    scale_x_continuous(breaks = seq(0, 35, by = 7)) +
+    ggtitle(.x)
+)
+
+```
+##### LBP exposure
+
+
+```{r}
+
+df_summ <- 
+  df |> 
+  # filter(.feature != "16S") |> 
+  group_by(uid, pid, randomized, arm, ITT, mITT, PP, site, visit_code, PIPV, visit, study_day) |> 
+  summarise(
+    LC106_total = sum(copies_per_swab_med[str_detect(LBP, "LC-106")], na.rm = TRUE),
+    LC115_excl_total = sum(copies_per_swab_med[!str_detect(LBP, "LC-106")], na.rm = TRUE),
+    total_LBP = sum(copies_per_swab_med[str_detect(LBP, "LC")], na.rm = TRUE),
+    total_16S = sum(copies_per_swab_med[.feature == "16S"], na.rm = TRUE),
+    n_LC106 = sum(str_detect(LBP, "LC-106") & (copies_per_swab_med != 0), na.rm = TRUE),
+    n_LC115_excl = sum(!str_detect(LBP, "LC-106") & (copies_per_swab_med != 0), na.rm = TRUE),
+    n_LBP = sum(str_detect(LBP, "LC") & (copies_per_swab_med != 0), na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    n_expected = 
+      case_when(
+        arm == "Pl" ~ 0,
+        str_detect(arm, "LC-106") ~ 6,
+        str_detect(arm, "LC-115") ~ 15,
+        TRUE ~ NA_real_
+      ),
+    n_detected_among_expected = 
+      case_when(
+        arm == "Pl" ~ n_LBP,
+        str_detect(arm, "LC-106") ~ n_LC106,
+        str_detect(arm, "LC-115") ~ n_LBP,
+        TRUE ~ NA_real_
+      ),
+    p_detected = n_detected_among_expected/n_expected
+  )
+
+```
+
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 7
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  geom_text(aes(label = n_LBP, col = total_LBP |> log10()), size = 2) +
+  scale_fill_viridis_c(option = "F") + guides(col = "none") +
+  scale_color_viridis_c(option = "F", direction = -1, na.value = "white") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = "Text = number of detected (>0) LBP strains by qPCR.")
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = n_LBP) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_viridis_c("") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = "Number of detected (>0) LBP strains by qPCR.")
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  # scale_fill_gradient2(low = "gray80", mid = "purple", high = "blue", midpoint = 7.5) +
+  scale_fill_viridis_c("proportion of LBP strains\ndetected among expected", option = "G") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = ".")
+
+
+```
+
+
+Comparison with self-declared exposure
+
+```{r}
+
+
+df_summ <- 
+  df_summ |> 
+  select(-starts_with("study_product")) |> 
+  left_join(
+    mae@metadata$exposures |> 
+      select(uid, pid, visit_code, starts_with("study_product"))
+  ) 
+
+
+```
+
+
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 7
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  geom_point(aes(shape = study_product |> factor()), size = 2, fill = "black", col = "white") +
+  scale_shape_manual("self-declared\nexposure", values = c(NA, 21)) +
+  scale_fill_viridis_c(option = "F") + 
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() + # 
+  geom_point(aes(shape = study_product |> factor()), size = 2, fill = "black", col = "white") +
+  scale_shape_manual("self-declared\nexposure", values = c(NA, 21)) +
+  scale_fill_viridis_c(
+    "proportion of LBP strains\ndetected among expected", option = "G"
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  )
+
+
+```
+
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 7
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  geom_point(aes(shape = study_product_PP |> round() |> factor()), size = 2, fill = "black", col = "white") +
+  scale_shape_manual("self-declared\nexposure", values = c(NA, 21)) +
+  scale_fill_viridis_c(option = "F") + 
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  )
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() + # 
+  geom_point(aes(shape = study_product_PP |> round() |> factor()), size = 2, fill = "black", col = "white") +
+  scale_shape_manual("self-declared\nexposure", values = c(NA, 21)) +
+  scale_fill_viridis_c(
+    "proportion of LBP strains\ndetected among expected", option = "G"
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+```
+
+
+Comparison with applicator staining
+
+```{r}
+
+
+df_summ <- 
+  df_summ |> 
+  select(-contains("applicator")) |> 
+  left_join(
+    applicator |> 
+      select(
+        pid, returned_used_applicators, number_of_returned_applicators, 
+             starts_with("applicator_stain")
+        )
+  ) |> 
+  mutate(
+    number_of_returned_applicators = number_of_returned_applicators |> replace_na(0),
+    n_pos_applicator = applicator_stain_positive |> replace_na(0),
+    p_pos_applicator = ifelse(number_of_returned_applicators == 0, 0.4, n_pos_applicator/number_of_returned_applicators)
+  )
+
+
+```
+
+
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 8
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_viridis_c(option = "F") + 
+  ggnewscale::new_scale_fill() +
+  geom_point(
+    data = df_summ |> filter(randomized, study_product == 1),
+    aes(shape = returned_used_applicators, fill = p_pos_applicator), 
+    size = 2, col = "white"
+    ) +
+  scale_fill_gradient2(
+    "Prop. pos.\napplicators",
+    high = "black", mid = "green", low = "yellow", 
+    midpoint = 0.5, breaks = c(0, 1/2, 1)
+    )  +
+  scale_shape_manual(
+    "Returned\napplicators", values = c(23, 21), 
+    guide = guide_legend(override.aes = list(color = "black", fill = "black"))
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() + 
+  scale_fill_viridis_c(
+    "proportion of LBP strains\ndetected among expected", option = "G"
+    ) +
+  ggnewscale::new_scale_fill() +
+  geom_point(
+    data = df_summ |> filter(randomized, study_product == 1),
+    aes(shape = returned_used_applicators, fill = p_pos_applicator), 
+    size = 2, col = "white"
+  ) +
+  scale_fill_gradient2(
+    "Prop. pos.\napplicators",
+    high = "black", mid = "green", low = "yellow", 
+    midpoint = 0.5, breaks = c(0, 1/2, 1)
+    ) +
+  scale_shape_manual(
+    "Returned\napplicators", values = c(23, 21), 
+    guide = guide_legend(override.aes = list(color = "black", fill = "black"))
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+```
+
+
+##### Exposed by qPCR
+
+```{r}
+
+df_summ <- 
+  df_summ |> 
+  mutate(
+    rel_ab = pmin(total_LBP/total_16S/2, 1),
+    exposed = (p_detected >= 0.5) & (total_LBP > 10^7)
+  )
+
+```
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 7
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  geom_text(aes(label = n_LBP, col = total_LBP |> log10()), size = 2) +
+  scale_fill_viridis_c(option = "F") + guides(col = "none") +
+  scale_color_viridis_c(option = "F", direction = -1, na.value = "white") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = "Text = number of detected (>0) LBP strains by qPCR.")
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = rel_ab) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_viridis_c(option = "F") + guides(col = "none") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = "Text = number of detected (>0) LBP strains by qPCR.")
+
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = n_LBP) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_viridis_c("") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = "Number of detected (>0) LBP strains by qPCR.")
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  # scale_fill_gradient2(low = "gray80", mid = "purple", high = "blue", midpoint = 7.5) +
+  scale_fill_viridis_c("proportion of LBP strains\ndetected among expected", option = "G") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = ".")
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = exposed) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_manual(
+    "Exposed by qPCR",
+    values = c("TRUE" = "blue", "FALSE" = "gray80"),
+    labels = c("TRUE" = "Yes", "FALSE" = "No")
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) +
+  labs(caption = ".")
+
+
+```
+
+```{r}
+
+df_summ_pid <- 
+  df_summ |> 
+  filter(randomized) |> 
+  mutate(
+    dosing_days = 
+      case_when(
+        arm %in% c("Pl","LC-106-7", "LC-106-3", "LC-115") ~ visit_code %in% c(1102:1201),
+        arm == "LC-106-o" ~ visit_code %in% c(1004:1103)
+      ),
+    exposed_tmp = 
+      case_when(
+        arm %in% c("Pl","LC-106-7", "LC-106-3", "LC-115") ~ exposed & dosing_days,
+        arm == "LC-106-o" ~ exposed & dosing_days
+      )
+  ) |> 
+  group_by(arm, site, pid, ITT, mITT, PP) |> 
+  summarise(
+    pid_exposed = any(exposed_tmp, na.rm = TRUE),
+    n_days_exposed = sum(exposed_tmp, na.rm = TRUE),
+    n_days_dosed = sum(dosing_days, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    prop_days_exposed = ifelse(n_days_exposed == 0, 0, n_days_exposed/n_days_dosed)
+  )
+
+
+```
+
+```{r}
+
+df_summ_pid |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    N = n(),
+    n = sum(pid_exposed, na.rm = TRUE),
+  ) |> 
+  mutate(
+    value = str_c(n, " / ", N, " (", round(100*n/N, 1), "%)")
+  ) |>  
+  select(-n, -N) |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  gt(caption = "Participants exposed by qPCR (daily home swabs): n/N (%)") 
+
+```
+
+
+```{r}
+
+bind_rows(
+  df_summ_pid |> filter(arm != "Pl"),
+  df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    mean_days_exposed = mean(n_days_exposed, na.rm = TRUE) |> round(1),
+    mean_prop_days_exposed = (100 * mean(prop_days_exposed, na.rm = TRUE)) |> round() |> str_c("%"),
+  ) |>  
+  select(-mean_days_exposed) |>
+  pivot_wider(names_from = arm, values_from = mean_prop_days_exposed) |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average %") 
+
+```
+
+
+
+##### Microbiota trajectories highlighting people exposed by qPCR
+
+Longitudinal stack relative abundances plot:
+
+```{r}
+
+rel_abs <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  dplyr::select(
+    .feature, .sample, uid, rel_ab, poor_quality_mg_data,
+    taxon_label, genus, LBP, strain_origin
+    ) 
+
+```
+
+```{r}
+
+rel_abs <- 
+  rel_abs |> 
+  group_by(.feature) |> 
+  mutate(max_rel_ab = max(rel_ab, na.rm = TRUE), mean_rel_ab = mean(rel_ab, na.rm = TRUE)) |> 
+  ungroup() |> 
+  arrange(is.na(LBP), -mean_rel_ab) |> 
+  mutate(.feature = .feature |> fct_inorder()) |> 
+  mutate(
+    taxon = 
+      case_when(
+        as.numeric(.feature) <= 29 ~ taxon_label,
+        (genus == "Lactobacillus") ~ "Other Lactobacillus",
+        TRUE ~ "Other non-Lacto."
+      )
+  ) |> 
+  arrange(is.na(LBP), LBP,genus != "Lactobacillus", genus, -mean_rel_ab) |> 
+  mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other Lactobacillus", "Other non-Lacto.", "Other", after = Inf))
+
+#  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
+
+
+
+```
+
+```{r}
+rel_abs_agg <- 
+  rel_abs |> 
+  group_by(uid, taxon, LBP, strain_origin, poor_quality_mg_data) |> 
+  summarize(rel_ab = sum(rel_ab), .groups = "drop") |> 
+  dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
+
+
+```
+
+
+
+
+```{r make-trajectories-plot-qPCR-exposure}
+
+tmp <- 
+  df_summ_pid |> 
+  right_join(rel_abs_agg |> select(pid) |> distinct()) |> 
+  mutate(
+    pid_label = 
+      case_when(
+        prop_days_exposed > 0.5 ~ "E",
+        prop_days_exposed > 0 ~ "e",
+        is.na(prop_days_exposed) ~ "?",
+        TRUE ~ "."
+      ) 
+    ) |> 
+  dplyr::select(pid, pid_label) |> 
+  distinct() 
+pid_label <- setNames(tmp$pid_label, tmp$pid)
+
+ 
+g_trajectories_qpcr_exp <-
+  rel_abs_agg |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
+  geom_col() +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(arm, site),
+    scales = "free_x", space = "free_x", 
+    strip = 
+      ggh4x::strip_nested(
+        background_x = 
+          ggh4x::elem_list_rect(
+            fill = c(rep("gray90",5), 
+                     rep(c("#FF0000", "#00868B"), 5))
+          ), 
+        text_x = 
+          ggh4x::elem_list_text(
+            face = rep("bold", 15),
+            colour = c(rep("black", 5), rep("white", 5), "transparent", "white", "transparent", rep("white", 3))
+            )              
+      )
+  ) +
+  scale_fill_manual(
+    "LBP strain or taxon",
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants", labels = pid_label) +
+  theme(
+    #strip.background.y = element_rect(fill = "gray90"),
+    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    strip.text.x = element_text(hjust = 0.5),
+    axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
+    axis.ticks.x = element_blank(),
+    legend.key.height = unit(15, "pt")
+  )  
+
+
+# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+
+
+
+```
+
+```{r display-trajectories-plot-qPCR-exposure}
+#| fig-height: 7.5
+#| fig-width: 12
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows."
+#| eval: true
+
+g_trajectories_qpcr_exp 
+
+```
+
+
+
+
+```{r make-trajectories-plot-applicator-exposure}
+
+tmp <- 
+  df_summ |> 
+  select(pid, number_of_returned_applicators, p_pos_applicator) |>
+  distinct() |> 
+  right_join(rel_abs_agg |> select(pid) |> distinct()) |> 
+  mutate(
+    pid_label = 
+      case_when(
+        is.na(number_of_returned_applicators) ~ "?",
+        number_of_returned_applicators == 0 ~ "?",
+        p_pos_applicator > 0.75 ~ "A",
+        p_pos_applicator > 0 ~ "a",
+        TRUE ~ "."
+      ) 
+    ) |> 
+  dplyr::select(pid, pid_label) |> 
+  distinct() 
+pid_label <- setNames(tmp$pid_label, tmp$pid)
+
+ 
+g_trajectories_appl_exp <-
+  rel_abs_agg |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
+  geom_col() +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(arm, site),
+    scales = "free_x", space = "free_x", 
+    strip = 
+      ggh4x::strip_nested(
+        background_x = 
+          ggh4x::elem_list_rect(
+            fill = c(rep("gray90",5), 
+                     rep(c("#FF0000", "#00868B"), 5))
+          ), 
+        text_x = 
+          ggh4x::elem_list_text(
+            face = rep("bold", 15),
+            colour = c(rep("black", 5), rep("white", 5), "transparent", "white", "transparent", rep("white", 3))
+            )              
+      )
+  ) +
+  scale_fill_manual(
+    "LBP strain or taxon",
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants", labels = pid_label) +
+  theme(
+    #strip.background.y = element_rect(fill = "gray90"),
+    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    strip.text.x = element_text(hjust = 0.5),
+    axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
+    axis.ticks.x = element_blank(),
+    legend.key.height = unit(15, "pt")
+  )  
+
+
+# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+
+
+
+```
+
+```{r display-trajectories-plot-applicator-exposure}
+#| fig-height: 7.5
+#| fig-width: 12
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows."
+#| eval: true
+
+g_trajectories_appl_exp 
+
+```
+
+
+#### all qPCR data (weekly swabs + daily home swabs)
+
+
+
+```{r}
+
+df <- 
+  bind_rows(
+    mae[["qPCR_daily"]] |> 
+      as_tibble() |> 
+      select(uid, .feature, copies_per_swab_med, taxon_label, LBP, strain_origin) |> 
+      mutate(data_source = "daily home swabs (new data)"),
+    mae[["qPCR"]] |>
+      as_tibble() |> 
+      select(uid, .feature, copies_per_swab_med, taxon_label, LBP, strain_origin) |> 
+      mutate(data_source = "weekly clinic swabs (old data)")
+  ) |> 
+  left_join(
+    mae@colData |> 
+      as_tibble() |> 
+      select(
+        uid, 
+        pid, 
+        visit_code, PIPV, visit, study_day, 
+        site, randomized, arm, ITT, mITT, PP
+      ),
+    by = join_by(uid)
+  ) |> 
+  arrange(LBP, strain_origin) |>
+  mutate(.feature = .feature |> fct_inorder())
+
+
+```
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+
+df |> 
+    filter(.feature == "16S", randomized) |> 
+    ggplot() +
+    aes(x = visit_code, y = pid, fill = data_source, alpha = copies_per_swab_med |> asinh()) +
+    ggh4x::facet_nested(arm + site ~ ., scales = "free", space = "free") +
+    geom_tile() +
+    theme(
+      axis.text = element_text(size = 6),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)
+    )
+
+```
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 8
+
+df |> 
+  filter(.feature == "16S", mITT) |> 
+  ggplot() +
+  aes(x = visit_code, y = copies_per_swab_med, col = data_source) +
+  ggh4x::facet_nested(arm + site ~ .) +
+  geom_line(aes(group = pid), alpha = 0.5) +
+  geom_point(size = 0.5) +
+  scale_y_log10() +
+  theme(
+    axis.text = element_text(size = 6),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)
+  )
+
+```
+
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x) |> 
+    ggplot() +
+    aes(x = visit_code, y = .feature, fill = data_source, alpha = copies_per_swab_med |> asinh()) +
+    ggh4x::facet_nested(site + pid ~ ., scales = "free", space = "free") +
+    geom_tile() +
+    ggtitle(.x) +
+    theme(
+      axis.text = element_text(size = 4),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)
+    )
+)
+
+```
+
+
+```{r}
+#| fig-width: 12
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x) |> 
+    ggplot() +
+    aes(x = visit_code, y = copies_per_swab_med, col = data_source ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+    geom_line(aes(group = .feature)) +
+    geom_point() +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    ggtitle(.x) +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
+)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#| fig-width: 12
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x, study_day >= 0) |> 
+    ggplot() +
+    aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
+    ) +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+    ) +
+    geom_line(aes(group = .feature)) +
+    geom_point(aes(shape = data_source)) +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    scale_x_continuous(breaks = seq(0, 35, by = 7)) +
+    ggtitle(.x)
+)
+
+```
+
+
+
+
+```{r}
+#| fig-width: 12
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x, study_day >= 0, study_day <= 45) |> 
+    ggplot() +
+    aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
+    ) +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+    ) +
+    geom_line(aes(group = .feature)) +
+    geom_point(aes(shape = data_source, size = data_source), alpha = 0.5) +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    scale_x_continuous(breaks = seq(0, 35, by = 7)) +
+    ggtitle(.x)
+)
+
+```

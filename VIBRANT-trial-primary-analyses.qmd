@@ -11,7 +11,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: refresh # true refresh false
+  cache: true # true refresh false
   warning: false
 knitr:
   opts_chunk:
@@ -79,6 +79,8 @@ fs::dir_ls(str_c(data_dir(), "01 Preprocessed and QCed/"), regexp = "exposures_.
   load()
 
 
+mae
+
 ```
 
 
@@ -108,6 +110,12 @@ fs::dir_ls(str_c(data_dir(), "01 Preprocessed and QCed/"), regexp = "exposures_.
 #| eval: true
 ```
 
+## Daily qPCR
+
+```{r 05-qPCR, child = '05-daily-qPCR.qmd'}
+#| eval: true
+```
+
 
 ## Figures
 
@@ -122,6 +130,7 @@ ggsave(
 
 
 ```{r}
+#| eval: false
 #| fig-height: 4
 #| fig-width: 12
 
