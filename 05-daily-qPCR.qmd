@@ -356,7 +356,13 @@ df_summ <-
   mutate(
     number_of_returned_applicators = number_of_returned_applicators |> replace_na(0),
     n_pos_applicator = applicator_stain_positive |> replace_na(0),
-    p_pos_applicator = ifelse(number_of_returned_applicators == 0, 0.4, n_pos_applicator/number_of_returned_applicators)
+    n_undetermined_applicator = applicator_stain_indeterminant |> replace_na(0),
+    p_pos_applicator = ifelse(number_of_returned_applicators == 0, 0.4, n_pos_applicator/number_of_returned_applicators),
+    p_pos_or_undet_applicator = 
+      ifelse(
+        number_of_returned_applicators == 0, 0.4, 
+        (n_pos_applicator + n_undetermined_applicator)/number_of_returned_applicators
+      )
   )
 
 
@@ -414,6 +420,73 @@ df_summ |>
   ) +
   scale_fill_gradient2(
     "Prop. pos.\napplicators",
+    high = "black", mid = "green", low = "yellow", 
+    midpoint = 0.5, breaks = c(0, 1/2, 1)
+    ) +
+  scale_shape_manual(
+    "Returned\napplicators", values = c(23, 21), 
+    guide = guide_legend(override.aes = list(color = "black", fill = "black"))
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+```
+
+
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 8
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() +
+  scale_fill_viridis_c(option = "F") + 
+  ggnewscale::new_scale_fill() +
+  geom_point(
+    data = df_summ |> filter(randomized, study_product == 1),
+    aes(shape = returned_used_applicators, fill = p_pos_or_undet_applicator), 
+    size = 2, col = "white"
+    ) +
+  scale_fill_gradient2(
+    "Prop. pos. or ?\napplicators",
+    high = "black", mid = "green", low = "yellow", 
+    midpoint = 0.5, breaks = c(0, 1/2, 1)
+    )  +
+  scale_shape_manual(
+    "Returned\napplicators", values = c(23, 21), 
+    guide = guide_legend(override.aes = list(color = "black", fill = "black"))
+    ) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom", legend.direction = "horizontal"
+  ) 
+
+
+df_summ |> 
+  filter(randomized) |> 
+  ggplot() +
+  aes(x = visit_code, y = pid, fill = p_detected) +
+  ggh4x::facet_nested(arm + site ~ ., scales = "free_y", space = "free_y") +
+  geom_tile() + 
+  scale_fill_viridis_c(
+    "proportion of LBP strains\ndetected among expected", option = "G"
+    ) +
+  ggnewscale::new_scale_fill() +
+  geom_point(
+    data = df_summ |> filter(randomized, study_product == 1),
+    aes(shape = returned_used_applicators, fill = p_pos_or_undet_applicator), 
+    size = 2, col = "white"
+  ) +
+  scale_fill_gradient2(
+    "Prop. pos. or ?\napplicators",
     high = "black", mid = "green", low = "yellow", 
     midpoint = 0.5, breaks = c(0, 1/2, 1)
     ) +
