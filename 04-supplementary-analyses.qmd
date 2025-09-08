@@ -1287,3 +1287,105 @@ rel_abs |>
 ```
 
 
+### LBP detection at week3 qPCR
+
+See "When using a more sensitive qPCR, we detected LBP strains at  > 10^7 copies/swab in YY/71 exposed people at V3, the week after product cessation, and YY/71 exposed people at V9, 12 weeks after product use". 
+
+1. At least a strain detected with > 10^7 copie per swab  
+
+We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to define a binary outcome (`outcome`), which is set to TRUE when the strain was detected above 10^7 copies per swab.
+
+We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if any LBP strain was detected above the threshold at that visit.
+
+```{r}
+
+detected_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["qPCR"]] |> 
+      as_tibble() |> 
+      select(.sample, .feature, copies_per_swab_med) |> 
+      filter(.feature != "16S") |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) 
+  ) |> 
+  mutate(outcome = ifelse(copies_per_swab_med > 1e7, TRUE, FALSE)) |> 
+  group_by(arm, pid, visit_code) |>
+  summarise(detected = any(outcome, na.rm = TRUE), .groups = "drop")
+
+```
+
+Finally, we restricted the analysis to participants randomized to an active arm (i.e., excluding placebo) and counted the number of participants with at least one LBP strain detected at visits 1300 and 2120.
+
+```{r}
+
+detected_qPCR |> 
+  filter(visit_code %in% c("1300","2120")) |>
+  filter(arm != "Pl") |> 
+  group_by(visit_code) |>
+  summarise(
+    n    = sum(detected),
+    tot_participant = n_distinct(pid),
+    .groups = "drop"
+  )
+
+```
+
+2. Total of LBP strains detected with > 10^7 copie per swab
+
+We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to calculate the total copies per swab for LBP strains per sample (`tot_copie_swab`). 
+
+We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if `tot_copie_swab` was above 10^7 at that visit.
+
+
+```{r}
+
+detected_qPCR_bis <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["qPCR"]] |> 
+      as_tibble() |> 
+      select(.sample, .feature, copies_per_swab_med) |> 
+      filter(.feature != "16S") |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) 
+  ) |> 
+  group_by(arm, mITT, pid, visit_code) |> 
+  summarise(tot_copie_swab = sum(copies_per_swab_med, na.rm = TRUE),  
+            detected = tot_copie_swab > 1e7, 
+            .groups = "drop") 
+
+```
+
+```{r}
+
+detected_qPCR_bis |> 
+  filter(visit_code %in% c("1300","2120")) |>
+  filter(arm != "Pl") |> 
+  group_by(visit_code) |>
+  summarise(
+    n    = sum(detected),
+    tot_participant = n_distinct(pid),
+    .groups = "drop"
+  )
+
+
+```
+
+
+
+
+
+
+
+

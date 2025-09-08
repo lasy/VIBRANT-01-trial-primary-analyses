@@ -46,11 +46,77 @@ g_trajectories <-
 
 # 04 - supplementary analyses
 
+
+### 08/09/2025
+
+#### LBP detection at week3 qPCR
+
+See "When using a more sensitive qPCR, we detected LBP strains at  > 107 copies/swab in YY/71 exposed people at V3, the week after product cessation, and YY/71 exposed people at V9, 12 weeks after product use"
+
+We use the `col_LBP_qPCR` SE, we filter for randomized and mITT participant. Then we filter for colonized **at** and visit 1300. 
+
+```{r}
+
+col_at_week3_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1300", .feature == "colonized_LBP_at_qpcr")
+  ) |> 
+  mutate(LBP_colonization_at_week3 = outcome |> replace_na(FALSE))
+  
+
+
+```
+
+We select participant in active arm (e.g. exclude the Placebo arm) and count the number of participant that had detected LBP at week 3 (visit 1300)
+
+```{r}
+
+col_at_week3_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_colonization_at_week3) |> 
+  gt()
+
+```
+
+```{r}
+
+col_at_week12_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "2120", .feature == "colonized_LBP_at_qpcr")
+  ) |> 
+  mutate(LBP_colonization_at_week12 = outcome |> replace_na(FALSE))
+```
+
+```{r}
+
+col_at_week12_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_colonization_at_week12) |> 
+  gt()
+
+```
+
 ### 21/08 Participants still colonized by week 12
-
-
-
-
 
 #### All arms 
 

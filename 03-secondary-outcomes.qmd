@@ -146,8 +146,8 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         aes(ymin = CI_low, ymax = CI_high, fill = arm, colour = arm), 
         alpha = 0.05, size = 0.2 #, color = NA
       ) +
-      geom_line(linewidth = 0.75) + #size = 0.35
-      geom_point(size = 3) + 
+      geom_line(linewidth = 1) + #size = 0.35
+      geom_point(size = 3.5) + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
         "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
@@ -157,35 +157,36 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
     scale_color_manual(
       "Arm",
       values = c(
-        "LC-106-7" = "#F97C2E",
+        "LC-106-7" = "darkorange", #F97C2E
         #F37122
         "LC-115"   = "#A43513",
         #8E2708
         "LC-106-3" = "dodgerblue1",
-        "LC-106-o" = "#DF3A95",
+        "LC-106-o" = "deeppink", #DF3A95
         "Pl"       = "#B3B3B3"
       )
     ) +
     scale_fill_manual(
       "Arm",
       values = c(
-        "LC-106-7" = "#FA9C61", #  - E5E750
+        "LC-106-7" = "darkorange", #  - E5E750
         "LC-115"   = "#9D2906",
         "LC-106-3" = "dodgerblue1", # #56B4E9
-        "LC-106-o" = "#DF3A95", # #CC79A7
-        "Pl"       = "grey90"
+        "LC-106-o" = "deeppink", # #CC79A7
+        "Pl"       = "grey80"
       )
     ) + 
-    scale_shape_manual(
-      "Arm", 
-      values = c(
-        "LC-106-7" = 15, #  - E5E750
-        "LC-115"   = 19,
-        "LC-106-3" = 4, # #56B4E9
-        "LC-106-o" = 3, # #CC79A7
-        "Pl"       = 1
-      )
-    )
+    scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) 
+    # scale_shape_manual(
+    #   "Arm", 
+    #   values = c(
+    #     "LC-106-7" = 15,
+    #     "LC-115"   = 19,
+    #     "LC-106-3" = 4,
+    #     "LC-106-o" = 3,
+    #     "Pl"       = 1
+    #   )
+    # )
       #scale_color_manual("Arm", values = arm_colors) +
       #scale_fill_manual("Arm", values = arm_colors) 
   }
@@ -390,7 +391,7 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
     
     get_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_Lc) |>
       ggplot() +
-      aes(x = study_week, y = prop_who_colonized_at, col = arm) +
+      aes(x = study_week, y = prop_who_colonized_at, col = arm, shape = arm) +
       facet_grid(site ~ .) +
       geom_ribbon(
         aes(ymin = CI_low, ymax = CI_high, fill = arm, colour = arm), 
@@ -404,23 +405,24 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         breaks = seq(0, 1, by = 0.2)
       )  +
       expand_limits(y = 0) +
+    scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) + 
     scale_color_manual(
       "Arm",
       values = c(
-        "LC-106-7" = "#F37122",
+        "LC-106-7" = "darkorange", #F37122
         "LC-115"   = "#8E2708",
         "LC-106-3" = "dodgerblue1",
-        "LC-106-o" = "#D068A1",
+        "LC-106-o" = "deeppink", #D068A1
         "Pl"       = "#B3B3B3"
       )
     ) +
     scale_fill_manual(
       "Arm",
       values = c(
-        "LC-106-7" = "#E69F00", #  - E5E750
+        "LC-106-7" = "darkorange", #  - E5E750
         "LC-115"   = "#9D2906",
         "LC-106-3" = "dodgerblue1", # #56B4E9
-        "LC-106-o" = "#CC79A7", # #CC79A7
+        "LC-106-o" = "deeppink", # #CC79A7
         "Pl"       = "grey90"
       )
     )
@@ -974,7 +976,8 @@ tmp <-
 #| fig-width: 12
 #| fig-height: 6
 
-tmp |> 
+g_colonized_among_exposed_supp <- 
+  tmp |> 
   ggplot() +
   aes(x = .feature, y = prop_colonized, col = site) +
   facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
@@ -990,7 +993,9 @@ tmp |>
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
-  
+
+g_colonized_among_exposed_supp
+
 ```
 
 

@@ -671,6 +671,157 @@ bind_rows(
 
 ```
 
+We add the CI (Student's CI) 
+
+```{r}
+
+bind_rows(
+  df_summ_pid |> filter(arm != "Pl"),
+  df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    n = sum(!is.na(prop_days_exposed)),
+    mean_prop_days_exposed = mean(prop_days_exposed, na.rm = TRUE),
+    sd_prop = sd(prop_days_exposed, na.rm = TRUE),
+    se = sd_prop / sqrt(n), 
+    ci_lower = pmax(0, mean_prop_days_exposed - qt(0.975, df = pmax(n - 1, 1)) * se),
+    ci_upper = pmin(1, mean_prop_days_exposed + qt(0.975, df = pmax(n - 1, 1)) * se), 
+    mean_with_ci = str_c(percent(mean_prop_days_exposed, accuracy = 1), " (", percent(ci_lower, accuracy = 1), "–", percent(ci_upper, accuracy = 1), ")"),
+    .groups = "drop"
+  ) |>  
+  select(arm, site, mean_with_ci) |>
+  pivot_wider(names_from = arm, values_from = mean_with_ci) |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average %") 
+
+
+```
+
+Using bootstrap's CI 
+
+```{r}
+
+boot_mean <- function(data, indices) {
+  d <- data[indices, ]
+  mean(d$prop_days_exposed, na.rm = TRUE)
+}
+
+boot_ci <- function(boot_obj) {
+  ci <- tryCatch(
+    boot::boot.ci(boot_obj, type = "perc"),
+    error = function(e) NULL
+  )
+  if (is.null(ci) || is.null(ci$percent)) {
+    return(c(NA, NA))
+  } else {
+    return(ci$percent[4:5])
+  }
+}
+
+df_summ_pid |> 
+  filter(arm != "Pl") |> 
+  bind_rows(
+    df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
+    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
+    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+  ) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  nest() |> 
+  mutate(
+    boot = map(data, ~ boot::boot(.x, statistic = boot_mean, R = 1000)),
+    ci_vals = map(boot, boot_ci),
+    mean_prop = map_dbl(boot, ~ .x$t0),
+    ci_lower = map_dbl(ci_vals, ~ .x[1]),
+    ci_upper = map_dbl(ci_vals, ~ .x[2]),
+    mean_with_ci = str_c(percent(mean_prop, accuracy = 1), " (", percent(ci_lower, accuracy = 1), "–", percent(ci_upper, accuracy = 1), ")")
+  ) |> 
+  select(arm, site, mean_with_ci) |> 
+  pivot_wider(names_from = arm, values_from = mean_with_ci) |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average % with 95% bootstrap CI")
+
+```
+
+```{r}
+
+summary_exposed_qpcr <-
+  df_summ_pid |>
+  filter(arm != "Pl") |>
+  mutate(
+    expo_grp = case_when(
+      prop_days_exposed > 0.5                     ~ ">50%",
+      prop_days_exposed > 0 & prop_days_exposed <= 0.5 ~ "1–50%",
+      prop_days_exposed == 0                      ~ "0%",
+      .default = NA_character_
+    ) |> factor(levels = c(">50%", "1–50%", "0%"))
+  ) |>
+  dplyr::count(arm, expo_grp, name = "n") |>
+  group_by(arm) |>
+  mutate(tot_participant = sum(n), p = n / tot_participant |> round(2)) |>
+  rowwise() |>
+  mutate(
+    CI = list(binom::binom.confint(n, tot_participant, method = "exact")[, c("lower","upper")])
+  ) |>
+  ungroup() |>
+  unnest_wider(CI, names_sep = "_")
+
+summary_exposed_qpcr |> 
+  group_by(arm) |> 
+  gt()|>
+  fmt_number(
+    columns = where(is.numeric),
+    decimals = 2
+  )
+
+```
+
+
+```{r}
+#| fig-height: 7.5
+#| fig-width: 12
+
+# supplementary figure 3
+
+exposed_qpcr <- 
+  summary_exposed_qpcr |> 
+  arrange(arm) |> 
+  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
+  ggplot() +
+  aes(x = arm, y = p, col = expo_grp) +
+  geom_linerange(
+    aes(ymin = CI_lower, ymax = CI_upper), 
+    linewidth = 1.5, alpha = 0.5, lineend = "round",
+    position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  scale_color_manual(" ", values = c(
+    ">50%" = "grey50",
+    "1–50%" = "steelblue", 
+    "0%" = "gold1"
+  )) +
+  xlab("") + 
+  scale_y_continuous(
+    name = "% of doses used by qPCR",
+    labels = scales::percent_format(accuracy = 1), 
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  theme(
+    panel.grid.major.x = element_blank()
+    # axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+exposed_qpcr
+
+# ggsave(
+#   exposed_qpcr, filename = "figures/Supp_Figure3_exposed_qpcr.pdf",
+#   width = 12, height = 7.5, dpi = 300, units = "in"
+# )
+
+```
+
 
 
 ##### Microbiota trajectories highlighting people exposed by qPCR
