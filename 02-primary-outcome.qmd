@@ -149,7 +149,7 @@ col_by_week5 |>
 
 #### Tests 
 
-We test for differences between the placebo arm and each active arm for the primary outcome using Fisher's exact test (exhaustive permutation test). 
+We test for differences between the placebo arm and each active arm for the primary outcome using a one-sided Fisher's exact test (exhaustive permutation test). 
 
 Data from both site are merged for each arm given the low numbers of participants at MGH.
 
