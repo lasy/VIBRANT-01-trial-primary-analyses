@@ -609,9 +609,9 @@ df_summ_pid <-
   mutate(
     dosing_days = 
       case_when(
-        arm %in% c("Pl","LC-106-7", "LC-115") ~ visit_code %in% c(1102:1201), # "LC-106-3",
-        arm == "LC-106-3" ~ visit_code %in% c(1102:1104),
-        arm == "LC-106-o" ~ visit_code %in% c(1004:1103)
+        arm %in% c("Pl","LC-106-7", "LC-115") ~ visit_code %in% c(1102:1201), # "LC-106-3", 
+        arm == "LC-106-3" ~ visit_code %in% c(1102:1104), 
+        arm == "LC-106-o" ~ visit_code %in% c(1004:1103) 
       ),
     exposed_tmp = 
       case_when(
@@ -752,6 +752,7 @@ df_summ_pid |>
 summary_exposed_qpcr <-
   df_summ_pid |>
   filter(arm != "Pl") |>
+  filter(mITT) |> 
   mutate(
     expo_grp = case_when(
       prop_days_exposed > 0.5                     ~ ">50%",
@@ -859,6 +860,33 @@ exposed_qpcr
 
 ```
 
+##### Colonization according to the exposure by qPCR 
+
+```{r}
+
+col_by_week5 |> 
+  left_join(
+    df_summ_pid |> 
+      filter(mITT) |> 
+      mutate(
+        expo_grp = case_when(
+          prop_days_exposed > 0.5                     ~ ">50%",
+          prop_days_exposed > 0 & prop_days_exposed <= 0.5 ~ ">0%, ≤50%",
+          prop_days_exposed == 0                      ~ "0%",
+          .default = NA_character_
+        ) |> factor(levels = c(">50%", ">0%, ≤50%", "0%"))
+      ) |> 
+      select(pid, expo_grp), 
+    by = "pid"
+    ) |> 
+  group_by(expo_grp) |> 
+  dplyr::count(LBP_colonization_by_week5) |> 
+  gt(row_group_as_column = TRUE)
+  
+  
+
+
+```
 
 
 ##### Microbiota trajectories highlighting people exposed by qPCR

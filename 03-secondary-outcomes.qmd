@@ -146,8 +146,8 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         aes(ymin = CI_low, ymax = CI_high, fill = arm, colour = arm), 
         alpha = 0.05, size = 0.2 #, color = NA
       ) +
-      geom_line(linewidth = 1) + #size = 0.35
-      geom_point(size = 3.5) + 
+      geom_line(linewidth = 0.75) + #size = 0.35
+      geom_point(size = 3) + 
       scale_x_continuous("Study weeks", breaks = c(-1:5,7,9,12), minor_breaks = 0:12) +
       scale_y_continuous(
         "Proportion of participants\nwith detected LBP strains", labels = scales::percent,
@@ -753,7 +753,7 @@ g_relative_abundance <-
     scales = "free_x", space = "free_x") +
   xlab("") +
   scale_y_continuous(
-    "Relative abundance bacteria", labels = scales::percent,
+    "Relative abundance\n (bacteria)", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
   scale_color_manual(values = site_colors) +

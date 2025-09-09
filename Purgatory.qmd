@@ -57,7 +57,7 @@ We use the `col_LBP_qPCR` SE, we filter for randomized and mITT participant. The
 
 ```{r}
 
-col_at_week3_qPCR <-
+wcol_at_week3_qPCR <-
   mae@colData |> as_tibble() |> 
   select(pid, site, randomized, arm, ITT, mITT, PP) |> 
   distinct() |> 

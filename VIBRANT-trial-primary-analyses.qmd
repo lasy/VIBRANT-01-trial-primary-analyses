@@ -137,10 +137,18 @@ ggsave(
 # figure 3
 
 figure3 <- 
-  g_prop_colonized_by_final +
-  g_long_terme_col +
-  plot_layout(ncol = 2, widths = c(1.5, 1)) +
-  plot_annotation(tag_level = "A") 
+  g_prop_colonized_by_final + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  g_long_terme_col + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  plot_layout(ncol = 2, widths = c(2, 1.4)) +
+  plot_annotation(tag_level = "A") + 
+  theme(
+    plot.tag = element_text(
+      face = "bold",
+      hjust = -0.5,  
+      vjust = 2     
+    ))
+
+figure3
 
 ggsave(
   figure3, filename = "figures/Figure3_colonization.pdf",

@@ -835,6 +835,119 @@ table_2_with_model_results |>
   
 ```
 
+**Tests (unconditional exact test & risk (benefit) ratios)**
+ 
+We test for differences between the placebo arm and each active arm for the primary outcome using a one-sided unconditional exact test. 
+
+Data from both site are merged for each arm given the low numbers of participants at MGH.
+
+The $p$-values are adjusted for multiple testing (multiple active arms against the Placebo) using the Benjamini-Hochberg method.
+
+
+```{r}
+
+arms_to_test <- col_by_week5$arm |> unique() |> setdiff("Pl")
+
+exact_test_results <-
+  map(
+  arms_to_test,
+  ~ {
+    arm_to_test <- .x
+    tmp <- col_by_week5 |> filter(arm %in% c("Pl", arm_to_test))
+    table_for_test <- table(tmp$LBP_colonization_by_week5, tmp$arm |> fct_drop())
+    
+    test_res <- 
+      exact2x2::uncondExact2x2(
+        x1 = table_for_test[2, 1], n1 = sum(table_for_test[, 1]),
+        x2 = table_for_test[2, 2], n2 = sum(table_for_test[, 2]),
+        alternative = "greater", parmtype = "ratio",
+        conf.level = 0.95, conf.int = TRUE, method = "FisherAdj"
+        )
+    
+    # test_res <- fisher.test(table_for_test, alternative = "greater")
+    tibble(
+      arm = arm_to_test,
+      p_value = test_res$p.value,
+      ratio = test_res$estimate,
+      lower_CI = test_res$conf.int[1],
+      upper_CI = test_res$conf.int[2]
+    )
+  }
+) |> 
+  bind_rows() |> 
+  mutate(
+    adj_p_value = p_value |> p.adjust(method = "BH")
+  )
+  
+```
+
+
+```{r}
+
+test_results <- 
+  exact_test_results |> 
+  mutate(
+    adj_p_value = adj_p_value |> scales::pvalue(accuracy = 0.001),
+    ratio = ratio |> round(2) |> as.character(),
+    CI = str_c(lower_CI |> round(2), " - ", upper_CI |> round(2))
+    ) |> 
+  select(arm, adj_p_value, ratio, CI) |>
+  pivot_longer(cols = -arm, names_to = "name", values_to = "value") |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  mutate(
+    name = 
+      case_when(
+        name == "adj_p_value" ~ "Adj. p-value",
+        name == "ratio" ~ "Benefit ratio",
+        name == "CI" ~ "95% CI",
+        TRUE ~ name
+      )
+  )
+  
+```
+
+```{r}
+
+table_2_with_model_results <- 
+  bind_rows(
+    table_2,
+    test_results
+  ) |> 
+  mutate(
+    site = site |> str_replace_na(""),
+    Pl = 
+      case_when(
+        name == "Adj. p-value" ~ "Ref.",
+        name == "Benefit ratio" ~ "",
+        str_detect(name, "CI") ~ "",
+        TRUE ~ Pl
+      )
+  )
+
+```
+
+
+```{r}
+
+table_2_with_model_results |> 
+  group_by(site) |>
+  gt(caption = "Table 2: Colonization by week 5 by arm and site", row_group_as_column = TRUE) |> 
+  cols_width(
+    "name" ~ px(150),
+    everything() ~ px(120)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    .fn = md
+  )
+  
+```
+
 ### LBP colonization by week 5, qPCR-estimated relative abundances
 
 These analyses include the immediate post-product visits.

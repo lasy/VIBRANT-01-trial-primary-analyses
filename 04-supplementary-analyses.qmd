@@ -207,7 +207,8 @@ Plot (Figure 3b)
 #| fig-width: 6
 #| fig-height: 4
 
-summary_col_still_col |> 
+g_long_terme_col <- 
+  summary_col_still_col |> 
   filter(!(arm %in% c("Pl", "All arms"))) |> 
   arrange(arm) |> 
   mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
@@ -229,6 +230,8 @@ summary_col_still_col |>
     panel.grid.major.x = element_blank()
     # axis.text.x = element_text(angle = 45, hjust = 1)
   )
+
+g_long_terme_col
 
 ```
 
@@ -1383,6 +1386,63 @@ detected_qPCR_bis |>
 ```
 
 
+### LBP detection week 3 (1300) and week 4_12 - qPCR
+
+See "The Lactin-V strain is detectable in 69-79% by qPCR in the week after cessation of product, and after 4-12 weeks of off-product follow up this proportion was 47-48%.22,24 We saw a similar proportion of detected LBP strains by qPCR in the week after cessation of product, and after an additional 7 weeks off product."
+
+```{r}
+# by qPCR 
+
+# one week after LBP = 1300
+# col_at ? 
+col_at_week3_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1300", .feature == "colonized_LBP_at_qpcr")
+  ) |> 
+  mutate(LBP_colonization_at_week3 = outcome |> replace_na(FALSE)) 
+
+col_at_week3_qPCR |> 
+  dplyr::count(LBP_colonization_at_week3) |> 
+  mutate(total = sum(n), 
+         p = n/total)
+
+
+
+# 4-12 week after LBP = 1700, 1900, 2120
+col_at_week4_12_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code %in% c("1700", "1900", "2120"), .feature == "colonized_LBP_at_qpcr")
+  ) |> 
+  mutate(LBP_colonization_at_week4_12 = outcome |> replace_na(FALSE)) 
+
+col_at_week4_12_qPCR |> 
+  group_by(visit_code) |> 
+  dplyr::count(LBP_colonization_at_week4_12) |> 
+  mutate(total = sum(n), 
+         p = n/total)
+
+
+```
 
 
 
