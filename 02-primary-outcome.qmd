@@ -124,7 +124,7 @@ table_2 |>
 
 ```{r}
 #| fig-width: 10
-#| fig-height: 1.8
+#| fig-height: 2
 
 col_by_week5 |> 
   arrange(site, arm, LBP_colonization_by_week5) |>
@@ -140,8 +140,11 @@ col_by_week5 |>
   xlab("Participant number") + ylab("") +
   theme(
     legend.position = "top",
+    legend.text = element_text(hjust = 0.5),
+    legend.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
-  ) 
+  ) +
+  guides(shape = guide_legend(ncol = 2))
 
 
 ```
@@ -665,7 +668,7 @@ col_by_week5 <-
 
 ```{r}
 #| fig-width: 10
-#| fig-height: 1.8
+#| fig-height: 2
 
 col_by_week5 |> 
   arrange(site, arm, LBP_colonization_by_week5) |>
@@ -681,8 +684,11 @@ col_by_week5 |>
   xlab("Participant number") + ylab("") +
   theme(
     legend.position = "top",
+    legend.text = element_text(hjust = 0.5),
+    legend.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
-  ) 
+  ) +
+  guides(shape = guide_legend(ncol = 2))
 
 
 ```
@@ -977,7 +983,7 @@ col_by_week5_qPCR <-
 
 ```{r}
 #| fig-width: 10
-#| fig-height: 2
+#| fig-height: 2.2
 
 
 col_by_week5_qPCR |> 
@@ -995,9 +1001,13 @@ col_by_week5_qPCR |>
   ggtitle("Colonization based on the relative abundances estimated by qPCR") +
   theme(
     legend.position = "top",
+    legend.text = element_text(hjust = 0.5),
+    legend.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
     plot.title = element_text(hjust = 0.5)
-  ) 
+  ) +
+  guides(shape = guide_legend(ncol = 2))
+
 
 ```
 
@@ -1179,7 +1189,7 @@ detected_by_week5_qPCR <-
 
 ```{r}
 #| fig-width: 10
-#| fig-height: 2
+#| fig-height: 2.2
 
 
 detected_by_week5_qPCR |> 
@@ -1197,9 +1207,14 @@ detected_by_week5_qPCR |>
   ggtitle("Colonization based on qPCR-based detection of at least 2 LBP strains detected at the same visit by week 5") +
   theme(
     legend.position = "top",
+    legend.text = element_text(hjust = 0.5),
+    legend.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
     plot.title = element_text(hjust = 0.5)
-  ) 
+  ) +
+  guides(shape = guide_legend(ncol = 2))
+
+  
 
 ```
 
@@ -1388,7 +1403,7 @@ crisp_dom_by_5week <-
 
 ```{r}
 #| fig-width: 10
-#| fig-height: 2
+#| fig-height: 2.2
 
 crisp_dom_by_5week |> 
   arrange(site, arm, crisp_dom_by_5week) |>
@@ -1405,9 +1420,13 @@ crisp_dom_by_5week |>
   ggtitle("L. crispatus dominance (≥ 50% by metagenomics)") +
   theme(
     legend.position = "top",
+    legend.text = element_text(hjust = 0.5),
+    legend.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
     plot.title = element_text(hjust = 0.5)
-  ) 
+  ) +
+  guides(shape = guide_legend(ncol = 2))
+
 
 
 ```

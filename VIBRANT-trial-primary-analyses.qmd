@@ -60,10 +60,9 @@ The data used for these analyses are stored in an `R Bioconductor MultiAssayExpe
 
 
 ```{r loading-mae}
-#| eval: true
-
+# Loading MAE_1
 mae_file <- 
-  fs::dir_ls(str_c(data_dir(), "04 unblinded MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
+  fs::dir_ls(str_c(data_dir(), "05 subsetted MAEs/"), regexp = "mae_1_.*\\.rds$") |> 
   sort(decreasing = TRUE) |>
   magrittr::extract(1)
 
@@ -73,14 +72,7 @@ mae <- readRDS(mae_file)
 
 rm(mae_file)
 
-fs::dir_ls(str_c(data_dir(), "01 Preprocessed and QCed/"), regexp = "exposures_.*\\.Rdata$") |> 
-  sort(decreasing = TRUE) |>
-  magrittr::extract(1) |> 
-  load()
-
-
 mae
-
 ```
 
 
@@ -160,12 +152,12 @@ ggsave(
 
 ```{r}
 #| fig-height: 4
-#| fig-width: 12
+#| fig-width: 10
 
 # figure 4 
 ggsave(
   g_relative_abundance, filename = "figures/Figure4_relative_abundance.pdf",
-  width = 12, height = 7.5, dpi = 300, units = "in"
+  width = 9, height = 6, dpi = 300, units = "in"
 )
 
 
@@ -179,7 +171,7 @@ ggsave(
 # figure 5 
 ggsave(
   g_colonized_among_exposed, filename = "figures/Figure5_colonized_among_exposed.pdf",
-  width = 12, height = 7.5, dpi = 300, units = "in"
+  width = 9, height = 6, dpi = 300, units = "in"
 )
 
 

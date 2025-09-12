@@ -200,7 +200,7 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
 #| fig-height: 7.5
 #| fig-width: 12
 
-g_prop_colonized_by_final <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
+g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
 g_prop_colonized_by_final # + ggtitle(fig_title) 
 
 ```
@@ -208,8 +208,10 @@ g_prop_colonized_by_final # + ggtitle(fig_title)
 
 
 ```{r}
+#| fig-height: 7.5
+#| fig-width: 12
 
-g_prop_colonized_by <- 
+g_prop_colonized_by_final <- 
   plot_longitudinal_proportions_of_participants_who_colonized(
     total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
     )
@@ -702,8 +704,8 @@ LBP_strains <-
 ```
 
 ```{r}
-#| fig-height: 7.5
-#| fig-width: 12
+#| fig-height: 6.5
+#| fig-width: 10
 
 
 # visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric())
@@ -745,7 +747,7 @@ g_relative_abundance <-
   ggplot() +
   aes(x = .feature, y = rel_ab, col = site, fill = site) +
   # geom_point(alpha = 0.5, size = 0.5) +
-  geom_boxplot(outlier.size = 0.5, alpha = 0.4) +
+  geom_boxplot(outlier.size = 0.7, alpha = 0.4) +
   #facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   ggh4x::facet_nested(
     rows = vars(visit_label),
@@ -753,7 +755,7 @@ g_relative_abundance <-
     scales = "free_x", space = "free_x") +
   xlab("") +
   scale_y_continuous(
-    "Relative abundance\n (bacteria)", labels = scales::percent,
+    "Relative abundance", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
   scale_color_manual(values = site_colors) +

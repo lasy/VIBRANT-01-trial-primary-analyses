@@ -248,20 +248,14 @@ From these three tables, we create the `applicator` table, which includes only p
 
 ```{r}
 
-applicator_returned <- 
-  metadata(mae)$crf_data_clean$crf23 |> 
-  as_tibble() |> 
-  select(uid, pid, visit_code, study_day, used_applicators, number_applicators) |> 
-  dplyr::rename(
-    returned_used_applicators = used_applicators,
-    number_of_returned_applicators = number_applicators
-  )
-
-applicator_stained <- 
-  metadata(mae)$crf_data_clean$crf46 |> 
-  as_tibble() |> 
-  select(-dfseq, -vdate_fixed)
-
+tmp <- 
+   metadata(mae)$participant_crfs_merged |> 
+   as_tibble() |> 
+   select(pid, used_applicators, number_applicators, applicator_stain_positive, applicator_stain_negative, applicator_stain_indeterminant, total_applicators_stained, proportion_positive_applicators, total) |> 
+   dplyr::rename(
+     returned_used_applicators = used_applicators,
+     number_of_returned_applicators = number_applicators
+   )
 
 study_product <- 
   mae@colData |> 
@@ -270,7 +264,7 @@ study_product <-
   distinct() |> 
   filter(randomized, mITT) |> 
   left_join(
-    exposures,  
+    metadata(mae)$exposures,  
     by = "pid"
   ) |>
   group_by(pid) |>
@@ -281,74 +275,20 @@ study_product <-
     .groups = "drop"
   ) 
 
-applicator <-
+applicator <- 
   mae@colData |> as_tibble() |>
   select(pid, site, randomized, arm, ITT, mITT, PP) |>
   distinct() |>
   filter(randomized, mITT) |>
-  left_join(applicator_returned, by = c("pid")) |>
-  left_join(
-    applicator_stained |> select(-ends_with("_control")),
-    by = c("uid", "pid", "visit_code", "study_day")
-  ) |>
+  left_join(tmp, by = c("pid")) |>
   left_join(study_product, by = "pid") 
 
-```
-
-
-
-```{r}
-#| fig-height: 5
-#| fig-width: 13
-
-applicator |> 
-  ggplot() +
-  aes(x = pid, y = visit_code, fill = number_of_returned_applicators |> as.factor()) +
-  facet_grid(. ~ arm, scales = "free", space = "free") +
-  geom_tile() + 
-  # geom_text(aes(label = str_c(applicator_stain_positive, "/", number_of_returned_applicators)), color = "black", size = 2) +  
-  scale_fill_manual( 
-    name = "Number of applicators \nreturned",
-    values = c(
-    "3" = "pink4", 
-    "4" = "pink3", 
-    "5" = "pink1", 
-    "6" = "seagreen2", 
-    "7" = "seagreen3", 
-    "8" = "seagreen4"
-    ), 
-    na.translate = FALSE) +
-  labs(
-    x = "Participant ID",
-    y = "Visit code",
-    # caption = "Text:\npositive applicators by staining / total number of applicators returned"
-    )  + 
-  theme(
-    axis.text.x = element_blank()
-    )
-
-```
-
-Some participants (mostly from the overlapping arm) returned applicators at two different visits. 
-
-According to the CAPRISA Vulindlela Pharmacy, when participants came to the clinic with an incomplete set of used applicators or still had to take additional study product doses, data about number of used applicator returned was reported in the CRFs, but the applicators were given back to participants who were requested/expected to return all applicators at the following visit once study product use was over. Based on these explanations, when applicators were returned at two visits, we keep only the data from the second visit.
-
-```{r}
-
-applicator <- 
-  applicator |>
-  group_by(pid) |>
-  mutate(
-    data_complete = !is.na(number_of_returned_applicators) | !is.na(applicator_stain_positive)
-  ) |>
-  arrange(pid, desc(data_complete), desc(visit_code)) |>
-  dplyr::slice(1) |> 
-  ungroup()
 
 ```
 
 
-We also note that two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
+
+We also that two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
 
 *   Participant 068-20-0425 reported taking the spare applicator out of its wrapping and placing it in the return bag without using or washing any applicators.
 
@@ -363,6 +303,7 @@ Here, we want to document the proportions of mITT participants who
 - returned any used applicators
 
 - returned their complete set of applicators (*i.e.,* 7 or 8 applicators)
+
 
 ```{r}
 
@@ -404,6 +345,17 @@ applicator <-
         TRUE ~ "???"
       )
   )
+
+```
+
+```{r}
+applicator |> 
+  dplyr::count(return_category, staining_done_category) |> 
+  group_by(return_category) |>
+  mutate(
+    `%` = round(n / sum(n), 3) * 100
+  ) |>
+  gt(row_group_as_column = TRUE)
 ```
 
 
@@ -559,6 +511,7 @@ We create category of the time of the last study product :
 ```{r}
 #| eval: true
 
+
 study_product <-
   mae@colData |>
   as_tibble() |>
@@ -566,17 +519,16 @@ study_product <-
   distinct() |>
   filter(randomized, mITT) |>
   left_join(
-    exposures |> select(pid, visit_code, study_product),
+    metadata(mae)$exposures |> select(pid, visit_code, study_product),
   by = "pid"
   ) |>
   left_join(
-    metadata(mae)$crf_data_clean$crf32 |>as_tibble(),
+    metadata(mae)$visits_crfs_merged |> as_tibble() |> select(pid, visit_code, study_day, insert_study_product_time),
     by = (c("pid", "visit_code"))) |>
   dplyr::rename(
     study_day_product = study_day,
     visit_code_product = visit_code
-  ) |> 
-  select(-vaginal_swab_collection_time)
+  ) 
 
 
 # study_day visit 2 in person
@@ -737,26 +689,36 @@ We first create a table containing the Nugent score for all participants at all 
 
 ```{r}
 # nugent score for all visits 
+
 nugent_score <- 
-  mae@colData |> as_tibble() |> 
+  mae@colData |> 
+  as_tibble() |> 
   select(uid, pid, visit_code, study_day, site, randomized, arm, ITT, mITT, PP) |> 
   distinct() |> 
   filter(randomized, mITT) |> 
   left_join(
-    metadata(mae)$crf_data_clean$crf14 |> 
+    metadata(mae)$visits_crfs_merged |> 
       as_tibble() |> 
-      select(uid, nugent_total_score)
+      select(pid, visit_code, nugent_total_score),
+    by = c("pid", "visit_code")
   ) |> 
+  # some pid x visit are duplicate but there is no data for the nugent score, so we remove the duplicate visit with no data for nugent score
+  group_by(pid, visit_code) |> 
+  arrange(is.na(nugent_total_score)) |>  
+  dplyr::slice(1) |>  
+  ungroup() |>
   group_by(visit_code) |> 
   mutate(any_Nugent = any(!is.na(nugent_total_score))) |> 
   ungroup() |> 
   filter(any_Nugent) |> 
   group_by(pid) |>
   mutate(
-    active_arm = ifelse(arm != "Pl", TRUE, FALSE), 
-    nugent_positive = ifelse(nugent_total_score >= 7, TRUE, FALSE)
+    active_arm = arm != "Pl",
+    nugent_positive = nugent_total_score >= 7
   ) |> 
   ungroup()
+
+
 
 ```
 
@@ -946,7 +908,9 @@ rBV_stats <-
   )
   
   
-rBV_stats |> filter(active_arm) |> dplyr::count(active_arm, BV_cure_post_MTZ, LBP_colonization_by_week5, BV_by_week12)
+rBV_stats |> 
+  filter(active_arm) |> 
+  dplyr::count(active_arm, BV_cure_post_MTZ, LBP_colonization_by_week5, BV_by_week12)
 
 ```
 
