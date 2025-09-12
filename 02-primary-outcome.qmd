@@ -60,7 +60,7 @@ summary_table <-
   ) |> 
   mutate(
     p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
+    CI = binom::binom.confint(n_success, n, method = "wilson") #exact
   )
 
 ```
@@ -707,7 +707,7 @@ summary_table <-
   ) |> 
   mutate(
     p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
+    CI = binom::binom.confint(n_success, n, method = "wilson")
   )
 
 ```
@@ -1026,7 +1026,7 @@ summary_table <-
   ) |> 
   mutate(
     p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
+    CI = binom::binom.confint(n_success, n, method = "wilson") #exact
   )
 
 ```
@@ -1233,7 +1233,7 @@ summary_table <-
   ) |> 
   mutate(
     p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
+    CI = binom::binom.confint(n_success, n, method = "wilson") #exact
   )
 
 ```
@@ -1446,7 +1446,7 @@ summary_table <-
   ) |> 
   mutate(
     p = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
+    CI = binom::binom.confint(n_success, n, method = "wilson") #exact
   )
 
 ```

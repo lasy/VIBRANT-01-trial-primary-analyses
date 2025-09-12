@@ -27,7 +27,7 @@ Among participants colonized by week 5, how many are still colonized at week 12?
 
 ```{r}
 
-# existe déjà 
+# already exists
 
 col_by_week5 <- 
   mae@colData |> as_tibble() |> 
@@ -1256,9 +1256,70 @@ rel_abs |>
 
 ### LBP detection at week3 qPCR
 
-See "When using a more sensitive qPCR, we detected LBP strains at  > 10^7 copies/swab in YY/71 exposed people at V3, the week after product cessation, and YY/71 exposed people at V9, 12 weeks after product use". 
+See "When using a more sensitive, but less specific, qPCR, we detected LBP strains at > 107 copies/swab in YY/71 exposed people at week 2, the visit just after product cessation, and YY/71 exposed people at V9, 12 weeks after product use.". 
 
-1. At least a strain detected with > 10^7 copie per swab  
+```{r}
+
+detected_at_week2_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1200", .feature == "LBP_detected_at_qpcr")
+  ) |> 
+  mutate(LBP_detected_at_week2 = outcome |> replace_na(FALSE)) 
+
+```
+
+```{r}
+
+detected_at_week2_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_detected_at_week2) |> 
+  gt()
+
+```
+
+```{r}
+
+detected_at_week12_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "2120", .feature == "LBP_detected_at_qpcr")
+  ) |> 
+  mutate(LBP_detected_at_week12 = outcome |> replace_na(FALSE)) 
+
+```
+
+```{r}
+
+detected_at_week12_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_detected_at_week12) |> 
+  gt()
+
+```
+
+
+(To remove?) 
+
+2. At least a strain detected with > 10^7 copie per swab  
 
 We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to define a binary outcome (`outcome`), which is set to TRUE when the strain was detected above 10^7 copies per swab.
 
@@ -1303,7 +1364,7 @@ detected_qPCR |>
 
 ```
 
-2. Total of LBP strains detected with > 10^7 copie per swab
+3. Total of LBP strains detected with > 10^7 copie per swab
 
 We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to calculate the total copies per swab for LBP strains per sample (`tot_copie_swab`). 
 
@@ -1358,8 +1419,8 @@ See "The Lactin-V strain is detectable in 69-79% by qPCR in the week after cessa
 # by qPCR 
 
 # one week after LBP = 1300
-# col_at ? 
-col_at_week3_qPCR <-
+
+detected_at_week3_qPCR <-
   mae@colData |> as_tibble() |> 
   select(pid, site, randomized, arm, ITT, mITT, PP) |> 
   distinct() |> 
@@ -1371,43 +1432,54 @@ col_at_week3_qPCR <-
         mae@colData |> as_tibble() |> select(uid, pid, visit_code),
         by = join_by(.sample == uid)
       ) |> 
-      dplyr::filter(visit_code == "1300", .feature == "colonized_LBP_at_qpcr")
+      dplyr::filter(visit_code == "1300", .feature == "LBP_detected_at_qpcr")
   ) |> 
-  mutate(LBP_colonization_at_week3 = outcome |> replace_na(FALSE)) 
+  mutate(LBP_detected_at_week3 = outcome |> replace_na(FALSE)) 
 
-col_at_week3_qPCR |> 
-  dplyr::count(LBP_colonization_at_week3) |> 
-  mutate(total = sum(n), 
-         p = n/total)
+detected_at_week3_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_detected_at_week3) |> 
+  mutate(p = n/sum(n) * 100) |> 
+  gt(caption = "Without placebo")
 
+detected_at_week3_qPCR |> 
+  dplyr::count(LBP_detected_at_week3) |>
+  mutate(p = n/sum(n) * 100) |> 
+  gt(caption = "With placebo")
 
-
-# 4-12 week after LBP = 1700, 1900, 2120
-col_at_week4_12_qPCR <-
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_LBP_qPCR"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code %in% c("1700", "1900", "2120"), .feature == "colonized_LBP_at_qpcr")
-  ) |> 
-  mutate(LBP_colonization_at_week4_12 = outcome |> replace_na(FALSE)) 
-
-col_at_week4_12_qPCR |> 
-  group_by(visit_code) |> 
-  dplyr::count(LBP_colonization_at_week4_12) |> 
-  mutate(total = sum(n), 
-         p = n/total)
 
 
 ```
 
+```{r}
+
+detected_at_week9_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_qPCR"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1900", .feature == "LBP_detected_at_qpcr")
+  ) |> 
+  mutate(LBP_detected_at_week9 = outcome |> replace_na(FALSE)) 
+
+detected_at_week9_qPCR |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(LBP_detected_at_week9) |> 
+  mutate(p = n/sum(n) * 100) |> 
+  gt(caption = "Without placebo")
+
+detected_at_week9_qPCR |> 
+  dplyr::count(LBP_detected_at_week9) |> 
+  mutate(p = n/sum(n) * 100) |> 
+  gt(caption = "With placebo")
+```
 
 
 
