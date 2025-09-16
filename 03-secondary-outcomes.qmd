@@ -201,7 +201,7 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
 #| fig-width: 12
 
 g_prop_colonized_by <- plot_longitudinal_proportions_of_participants_who_colonized(total_rel_ab_of_LBP)
-g_prop_colonized_by_final # + ggtitle(fig_title) 
+g_prop_colonized_by # + ggtitle(fig_title) 
 
 ```
 
@@ -215,7 +215,7 @@ g_prop_colonized_by_final <-
   plot_longitudinal_proportions_of_participants_who_colonized(
     total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
     )
-g_prop_colonized_by + ggtitle(fig_title) 
+g_prop_colonized_by_final + ggtitle(fig_title) 
 
 ```
 
