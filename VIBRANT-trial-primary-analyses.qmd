@@ -185,7 +185,7 @@ ggsave(
 # Supp figure 4 
 ggsave(
   g_colonized_among_exposed_supp, filename = "figures/Suppl_Figure4_colonized_among_exposed.pdf",
-  width = 12, height = 7.5, dpi = 300, units = "in"
+  width = 9, height = 6, dpi = 300, units = "in"
 )
 
 

@@ -21,15 +21,16 @@ editor: source
 
 ### Summary table 
 
-The demographics table is built as follow.
+The demographics table is constructed as follows.
 
-We first create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae`. 
+We first create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae` object. 
 
-This table contains almost all variables needed to create the demographics table (*i.e., *`site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month`, `contraception_method`).
+This table contains most of the variables required for the demographics summary, including: site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month` and `contraception_method`. 
 
-In addition, the `mae@colData` contains the participants' `arm` and study population flags (here we keep the `mITT` population). 
+Additional variables such as arm and study population flags are retrieved from `mae@colData`. For this analysis, we restrict the dataset to participants in the mITT population.
 
-From the variables listed above, we create the variable `food_insecurity` using the three variables `cut_size_meals`, `eat_less` and `hungry_did_not_eat`: if a participant answered "Yes" to any of the corresponding questions, then she is considered to be affected by food insecurity.
+From the food-related variables (`cut_size_meals`, `eat_less`, and `hungry_did_not_eat`), we derive a new variable `food_insecurity`. A participant is considered food insecure if she answered "Yes" to any of the three questions.
+
 
 ```{r}
 
@@ -54,7 +55,7 @@ table1_data <-
 ```
 
 
-```{r}
+```{r, figure-food-insecurity, fig.width=6, fig.height=4}
 #| eval: false
 
 table1_data |> 
@@ -67,18 +68,18 @@ table1_data |>
 ```
 
 
-In addition to these variables, we also include the participants' partner's gender. 
+In addition to these variables, we also include information about about the gender of participants' sexual partners.
 
-Participants are asked about their partner's gender at all weekly visits (1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, 2120) using CRF 19. 
+PParticipants were asked about their partner's gender at each weekly visit (weeks 0 through 12: visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, and 2120) using Case Report Form (CRF) 19. Responses are recorded in the `past_week_sex_partner` column of the `mae@metadata$visits_crfs_merged` table. 
 
-Answers to that question can be found in the `past_week_sex_partner` column of the `mae@metadata$visits_crfs_merged` table. Participants' answer throughout the weekly visits will be summarized into one of these 4 categories:
+Based on participants' answers across all weekly visits, we categorized their reported partner gender into one of four groups:
 
 - No sex
 - Only male 
 - Only female
 - Both
 
-This variable is added to the `table1_data` table.
+This derived variable is included in the `table1_data` table.
 
 ```{r}
 
@@ -110,15 +111,12 @@ table1_data <-
 
 
 
-We also re-code the `race` variable as follows:
+We also recoded the race variable to simplify and harmonize categories:
 
 - "Asian or South Asian" is re-coded to "Asian" (for brevity)
 - "Black, African American, or African" and "African" are re-coded to "Black/African" (for brevity)
 - "Coloured", "White", "Other", and "Prefered not to answer" are left as is.
 
-:::callout-note
-@Disebo & Caroline: do we go for British or American English? (Colored vs Coloured)?
-:::
 
 
 ```{r}
@@ -155,13 +153,13 @@ table1_data <-
   )
 
 ```
-:::callout-warning
-@Laura Vermeren: I changed the summary statistics from mean to median for the continuous variables (for number of past sexual partner, the mean was artificially high in the arm with the 90 partner MGH participant). Would you be able to check that the tests selected by the `gt_summary` package are appropriate for the data we have? They should be, but I'd love if we could double-check :)
->LV : I check and I think it is good :)  
-:::
 
 
 ### Table 1 (Population characteristics by arm)
+
+**Table 1** summarizes baseline demographic and behavioral characteristics of the participants described above, stratified by study arm and restricted to the mITT population.. Continuous variables are presented as median and range (minimum–maximum), while categorical variables are shown as counts and percentages. 
+
+Comparisons across study arms are performed using the Kruskal-Wallis rank sum test for continuous variables. For categorical variables, either Fisher’s exact test or Pearson’s Chi-squared test is used, depending on cell counts and expected frequencies.
 
 ```{r}
 
@@ -189,6 +187,7 @@ Study population characteristics appear balanced across arms.
 
 ### Population characteristics by site
 
+An additional version of Table 1 is generated using the same variables and summary methods, but stratified by study site instead of study arm. 
 
 ```{r}
 
@@ -215,6 +214,8 @@ table1_data |>
 There are, unsurprisingly, striking differences in study population characteristics by site.
 
 ### Population characteristics by arm, split by site
+
+Separate versions of Table 1 are also generated for each study site, with participant characteristics summarized by study arm within each site.
 
 ```{r}
 

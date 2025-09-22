@@ -741,7 +741,8 @@ LBP_strains |>
 g_relative_abundance <- 
   LBP_strains |> 
   mutate(
-    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric()), 
+    strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains")
     ) |>
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
