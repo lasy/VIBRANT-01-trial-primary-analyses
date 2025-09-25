@@ -544,6 +544,8 @@ table_2_with_model_results |>
 
 **Defining the alternative primary outcome**
 
+We defined an alternative primary outcome that excluded visits conducted immediately after the last product administration. Specifically, for participants in the 7-dose arms (LC-107-7 and LC-115) and placebo, we eclude visit 1200, while for participants in the 3-dose arm (LC-106-3) and overlap arm (LC-106-o) only visits prior to 1200 (1000 and 1100) were excluded. 
+
 ```{r}
 
 new_outcome_def <- 
@@ -956,7 +958,9 @@ table_2_with_model_results |>
 
 ### LBP colonization by week 5, qPCR-estimated relative abundances
 
-These analyses include the immediate post-product visits.
+As a sensitivity analysis, we defined colonization by any of the LBP strains using relative abundances estimated from qPCR data. For each participant and visit, the relative abundance of each LBP strain was computed as the ratio of the strain-specific copies per swab to the total 16S rRNA gene copies per swab. In line with the metagenomic definition, colonization at a given visit was considered present if the total relative abundance of all LBP strains exceeded 10% or if the maximum relative abundance of any single LBP strain exceeded 5%. These analyses included the immediate post-product visits.
+
+The computation itself has been done at the QC/Pre-processing stage (see the [`VIBRANT-0-QC-and-preprocessing` GitHub repository](https://github.com/lasy/VIBRANT-0-QC-and-preprocessing)).
 
 ```{r}
 

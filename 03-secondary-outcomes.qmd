@@ -29,6 +29,8 @@ fig_title <- mae_title(mae)
 
 #### Total relative abundances of LBP strains
 
+To investigate the kinetics of colonization, we estimated at each clinic visit the total relative abundance of all LBP strains combined from metagenomic sequencing data. For each participant, the relative abundances of the individual LBP strains were summed, and trajectories were visualized over time stratified by study arm and site. 
+
 ```{r}
 
 total_rel_ab_of_LBP <- 
@@ -96,6 +98,8 @@ g_tot_prop_LBP_strains
 ```
 
 
+To facilitate interpretation, each participant within the same study arm and site is labeled by a unique number. These numbers allow visual tracking of individual trajectories across visits within each stratified panel.
+
 
 ```{r}
 #| fig-width: 10
@@ -132,6 +136,14 @@ get_longitudinal_proportions_of_participants_who_colonized <-
       )
   }
 
+arm_colors <- c(
+  "LC-106-7" = "darkorange", 
+  "LC-115"   = "#8E2708",
+  "LC-106-3" = "dodgerblue1",
+  "LC-106-o" = "deeppink",
+  "Pl"       = "#B3B3B3"
+)
+
 ```
 
 ```{r}
@@ -154,41 +166,9 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
         breaks = seq(0, 1, by = 0.2)
       )  +
       expand_limits(y = 0) +
-    scale_color_manual(
-      "Arm",
-      values = c(
-        "LC-106-7" = "darkorange", #F97C2E
-        #F37122
-        "LC-115"   = "#A43513",
-        #8E2708
-        "LC-106-3" = "dodgerblue1",
-        "LC-106-o" = "deeppink", #DF3A95
-        "Pl"       = "#B3B3B3"
-      )
-    ) +
-    scale_fill_manual(
-      "Arm",
-      values = c(
-        "LC-106-7" = "darkorange", #  - E5E750
-        "LC-115"   = "#9D2906",
-        "LC-106-3" = "dodgerblue1", # #56B4E9
-        "LC-106-o" = "deeppink", # #CC79A7
-        "Pl"       = "grey80"
-      )
-    ) + 
+    scale_color_manual("Arm",values = arm_colors) +
+    scale_fill_manual("Arm",values = arm_colors) + 
     scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) 
-    # scale_shape_manual(
-    #   "Arm", 
-    #   values = c(
-    #     "LC-106-7" = 15,
-    #     "LC-115"   = 19,
-    #     "LC-106-3" = 4,
-    #     "LC-106-o" = 3,
-    #     "Pl"       = 1
-    #   )
-    # )
-      #scale_color_manual("Arm", values = arm_colors) +
-      #scale_fill_manual("Arm", values = arm_colors) 
   }
 
 
@@ -205,7 +185,7 @@ g_prop_colonized_by # + ggtitle(fig_title)
 
 ```
 
-
+For the sake of clarity, we remove the two arms that only one participant in the MGH is involved in.
 
 ```{r}
 #| fig-height: 7.5
@@ -280,6 +260,10 @@ g_prop_colonized_by +  ggtitle(fig_title)
 ### Kinetics of *L. crispatus* colonization
 
 #### Total relative abundances of *L. crispatus* 
+
+We further examined colonization dynamics by focusing on *Lactobacillus crispatus*, irrespective of whether strains belonged to the investigational product. 
+
+For each participant and visit, the total relative abundance of *L. crispatus* was calculated by summing all metagenomic features annotated to this species. Trajectories were visualized over time stratified by study arm and site.
 
 ```{r}
 
@@ -363,6 +347,8 @@ g_tot_prop_Lc +
 
 #### Proportions of participants who colonized with 50% *L. crispatus* in each arm and each visit
 
+We estimated at each visit the proportion of participants whose vaginal microbiota was dominated by L. crispatus (defined as a relative abundance >50%). For each study arm and site, proportions were calculated together with 95% confidence intervals derived from binomial tests.
+
 
 ```{r}
 
@@ -410,23 +396,11 @@ plot_longitudinal_proportions_of_participants_who_colonized <- function(total_re
     scale_shape_manual("Arm", values = c(1, 19, 15, 17, 8)) + 
     scale_color_manual(
       "Arm",
-      values = c(
-        "LC-106-7" = "darkorange", #F37122
-        "LC-115"   = "#8E2708",
-        "LC-106-3" = "dodgerblue1",
-        "LC-106-o" = "deeppink", #D068A1
-        "Pl"       = "#B3B3B3"
-      )
+      values = arm_colors
     ) +
     scale_fill_manual(
       "Arm",
-      values = c(
-        "LC-106-7" = "darkorange", #  - E5E750
-        "LC-115"   = "#9D2906",
-        "LC-106-3" = "dodgerblue1", # #56B4E9
-        "LC-106-o" = "deeppink", # #CC79A7
-        "Pl"       = "grey90"
-      )
+      values = arm_colors
     )
   }
 
@@ -513,11 +487,211 @@ g_prop_colonized_by + ggtitle(fig_title)
 
 ### Durability of colonization
 
+We assessed the persistence of colonization among participants who had achieved LBP colonization by week 5. Specifically, we compared colonization status at week 12 to determine the proportion of initially colonized participants who remained colonized at the end of follow-up.
 
-> TODO: add/do figure 3D (include CIs)
+```{r}
 
-= proportion of participants who colonized by week 5 that still have colonization by week 12.
+col_by_week5 <- 
+  mae@colData |> as_tibble() |> 
+  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
+  ) |> 
+  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
 
+
+col_at_week12 <- 
+  mae@colData |> as_tibble() |> 
+  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["col_LBP_mg"]] |> 
+      as_tibble() |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) |> 
+      dplyr::filter(visit_code == "2120", .feature == "colonized_LBP_at_mg")
+  ) |> 
+  mutate(LBP_colonization_at_week12 = outcome |> replace_na(FALSE)) 
+
+
+col_still_col <- 
+  col_by_week5 |> 
+  dplyr::select(pid, site, arm, randomized, ITT, mITT, PP, LBP_colonization_by_week5) |> 
+  left_join(
+    col_at_week12 |> dplyr::select(pid, LBP_colonization_at_week12 ),
+    by = c("pid")
+  )
+
+```
+
+
+
+```{r}
+
+summary_col_still_col <-
+  bind_rows(
+    # by site and arms
+    col_still_col |> 
+      filter(LBP_colonization_by_week5) |>
+      group_by(site, arm) |> 
+      summarize(
+        n = n(),  # total with colonization at week 5
+        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+        .groups = "drop"
+      ),
+    # combining sites, by arm
+    col_still_col |> 
+      filter(LBP_colonization_by_week5) |>
+      group_by(arm) |> 
+      summarize(
+        n = n(),  # total with colonization at week 5
+        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
+        .groups = "drop"
+      ) |> 
+      mutate(site = "CAP & MGH")
+  ) |> 
+  mutate(
+    site = site |> fct_inorder(),
+    arm = arm |> fct_expand("All arms", "All active arms")
+    )
+
+summary_col_still_col <- 
+  summary_col_still_col |> 
+  bind_rows(
+    # overall by site, all arms
+    summary_col_still_col |> 
+      group_by(site) |> 
+      summarize(
+        n = sum(n),  # total with colonization at week 5
+        n_success = sum(n_success),  # still colonized at week 12
+        .groups = "drop"
+      ) |> 
+      mutate(arm = "All arms" |> factor(levels = summary_col_still_col$arm |> levels())),
+    # overall by site, all active arms
+    summary_col_still_col |>
+      filter(arm != "Pl") |>
+      group_by(site) |> 
+      summarize(
+        n = sum(n),  # total with colonization at week 5
+        n_success = sum(n_success),  # still colonized at week 12
+        .groups = "drop"
+      )  |> 
+      mutate(arm = "All active arms" |> factor(levels = summary_col_still_col$arm |> levels()))
+  )
+
+summary_col_still_col <- 
+  summary_col_still_col |> 
+  mutate(
+    p_col_stil_col = n_success / n,
+    CI = binom::binom.confint(n_success, n, method = "exact")
+  )
+
+```
+
+
+```{r}
+
+table_still_col <- 
+  summary_col_still_col |> 
+  mutate(
+    N_per_site_and_arm = str_c("N = ", n),
+    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
+    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
+  ) |> 
+  dplyr::select(
+    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
+  ) |> 
+  pivot_longer(-c(site, arm)) |>
+  mutate(
+    name = 
+      case_when(
+        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
+        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
+        name == "CI_text" ~ "95% CI"
+      )
+  ) |>
+  arrange(arm) |> 
+  pivot_wider(
+    id_cols = c(site, name), 
+    names_from = arm,
+    values_from = value, values_fill = ""
+    ) |> 
+  arrange(site)
+
+```
+
+```{r}
+
+table_still_col |> 
+  group_by(site) |> 
+  gt(
+    caption = "Colonization at week 12 among participants colonized by week 5 by arm", 
+    row_group_as_column = TRUE
+    ) |> 
+  cols_width(
+    "name" ~ px(200),
+    everything() ~ px(120)
+  ) |> 
+  cols_align(
+    align = "center", 
+    columns = c(Pl, `LC-106-7`, `LC-106-3`, `LC-106-o`, `LC-115`, `All arms`, `All active arms`)
+  ) |> 
+  cols_label(
+    name = "",
+    Pl = "Placebo",
+    `LC-106-7` = "LC-106<br>7 days",
+    `LC-106-3` = "LC-106<br>3 days",
+    `LC-106-o` = "LC-106<br>overlap",
+    `LC-115` = "LC-115<br>7 days",
+    `All active arms` = "All active<br>arms",
+    .fn = md
+  )
+
+```
+
+
+```{r}
+#| fig-width: 6
+#| fig-height: 4
+
+g_long_terme_col <- 
+  summary_col_still_col |> 
+  filter(!(arm %in% c("Pl", "All arms"))) |> 
+  arrange(arm) |> 
+  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
+  ggplot() +
+  aes(x = arm, y = p_col_stil_col, col = site) +
+  geom_linerange(
+    aes(ymin = CI$lower, ymax = CI$upper), 
+    linewidth = 1.5, alpha = 0.5, lineend = "round",
+    position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  scale_color_manual("Study site", values = c(site_colors, c("CAP & MGH" = "gray30"))) +
+  xlab("") + 
+  scale_y_continuous(
+    name = "% participants colonized by week 5\nwith LBP strain detected at week 12",
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  theme(
+    panel.grid.major.x = element_blank()
+    # axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+g_long_terme_col
+
+```
 
 
 
@@ -557,7 +731,6 @@ rel_abs <-
   arrange(is.na(LBP), LBP,genus != "Lactobacillus", genus, -mean_rel_ab) |> 
   mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other Lactobacillus", "Other non-Lacto.", "Other", after = Inf))
 
-#  arrange(is.na(LBP), LBP, genus != "Lactobacillus", -mean_rel_ab) |> 
 
 
 
@@ -598,7 +771,7 @@ g_trajectories <-
     pid = pid |> fct_inorder(),
     visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
     ) |> 
-  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + 
   geom_col() +
   ggh4x::facet_nested(
     rows = vars(visit_label),
@@ -624,15 +797,12 @@ g_trajectories <-
     labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
     guide = guide_legend(ncol = 1)
     ) +
-  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
   scale_y_continuous(
     "Relative abundance", labels = scales::percent,
     breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
   ) +
   scale_x_discrete("Participants", labels = pid_label) +
   theme(
-    #strip.background.y = element_rect(fill = "gray90"),
-    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
     strip.text.x = element_text(hjust = 0.5),
     axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 15, margin = margin(t = -1)), 
     axis.ticks.x = element_blank(),
@@ -640,7 +810,6 @@ g_trajectories <-
   )  
 
 
-# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
 
 
 
@@ -691,6 +860,8 @@ mae[["amplicon"]] |>
 
 ### Individual LBP strains by sites
 
+Relative abundance of each strain at each visit as estimated by metagenomic sequencing. Strains are organized according to geographical origin, and product(s) in which they are included.
+
 ```{r}
 
 LBP_strains <- 
@@ -708,8 +879,6 @@ LBP_strains <-
 #| fig-width: 10
 
 
-# visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric())
-
 LBP_strains |> 
    mutate(
     visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
@@ -717,11 +886,7 @@ LBP_strains |>
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
   aes(x = .feature, y = rel_ab, col = site, fill = site) +
-  # geom_point(alpha = 0.5, size = 0.5, position = position_dodge(width = 0.5)) +
-  # geom_violin(col = NA, alpha = 0.4) + # > TODO: check if it looks good - IT DOES NOT!
   ggbeeswarm::geom_quasirandom(alpha = 0.5, size = 0.5, dodge.width = 0.5) +
-  # geom_boxplot(outlier.size = 0.5) +
-  # facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   ggh4x::facet_nested(
     rows = vars(visit_label),
     cols = vars(LBP, strain_origin),
@@ -747,9 +912,7 @@ g_relative_abundance <-
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
   ggplot() +
   aes(x = .feature, y = rel_ab, col = site, fill = site) +
-  # geom_point(alpha = 0.5, size = 0.5) +
   geom_boxplot(outlier.size = 0.7, alpha = 0.4) +
-  #facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
   ggh4x::facet_nested(
     rows = vars(visit_label),
     cols = vars(LBP, strain_origin),
@@ -768,6 +931,7 @@ g_relative_abundance
   
 ```
 
+Relative abundances of individual LBP strains estimated by metagenomic sequencing across study weeks, stratified by site, strain origin, and strain identity. Each line represents the longitudinal trajectory of one participant; points show visit-specific measurements.
 
 ```{r}
 #| fig-width: 12
@@ -779,13 +943,15 @@ LBP_strains |>
   aes(x = study_week, y = rel_ab, col = strain_origin) +
   geom_point(alpha = 0.5, size = 0.5) +
   geom_line(aes(group = pid), alpha = 0.5) +
-  facet_grid(site ~ LBP |> str_replace("&", "&\n") + strain_origin + .feature , scales = "free_x", space = "free_x") +
+  ggh4x::facet_nested(
+    rows = vars(site),
+    cols = vars(LBP, strain_origin, .feature),
+    scales = "free_x", space = "free_x") +
   xlab("Study week") +
   scale_y_continuous(
     "Relative abundance bacteria", labels = scales::percent,
     breaks = seq(0, 1, by = 0.2)
   ) +
-  #scale_color_manual(values = colorspace::darken(scale_colour_hue()$palette(2), amount = 0.4)) +
   scale_color_manual("Strain origin", values = strain_origin_colors) +
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
@@ -796,6 +962,12 @@ LBP_strains |>
 
 
 ### Proportion colonized among exposed
+
+We estimated the proportion of exposed participants who ever colonized with each LBP strain during follow-up (visits after the first 2 weeks), based on metagenomic relative abundances. 
+
+Colonization was defined at the participant level as detection of a given strain at ≥5% relative abundance in at least one post-week 2 sample. Placebo participants were excluded, since they were not exposed to any of the strains. 
+
+For LC-115 strains, only participants in the LC-115 arm were considered exposed, while for LC-106 strains all participants in active arms were considered exposed. For each strain and site, we calculated the number of exposed participants, the number who colonized, the corresponding proportion, and 95% confidence intervals using Wilson’s method.
 
 ```{r}
 
@@ -852,9 +1024,9 @@ tmp <-
 
 g_colonized_among_exposed <- 
   tmp |> 
+  mutate(strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains")) |>
   ggplot() +
   aes(x = .feature, y = prop_colonized, col = site) +
-  #facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +
    ggh4x::facet_nested(
     cols = vars(LBP, strain_origin),
     scales = "free_x", space = "free_x") +
@@ -918,6 +1090,8 @@ tmp |>
 
 
 #### Excluding immediate post-product visit
+
+Same analyze as above but excluding the week 2 visit for the LC-106-7 and LC-115 arms, since this visit is immediately after product use.
 
 ```{r}
 
@@ -983,6 +1157,7 @@ tmp <-
 
 g_colonized_among_exposed_supp <- 
   tmp |> 
+  mutate(strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains")) |>
   ggplot() +
   aes(x = .feature, y = prop_colonized, col = site) +
   facet_grid(. ~ LBP + strain_origin, scales = "free", space = "free") +

@@ -24,6 +24,8 @@ editor: source
 
 #### New data (daily home swabs)
 
+After unblinding, qPCR assays were performed on daily self-collected swabs to ainform true exposure. In this section, we analyze these daily qPCR data to describe patterns of LBP detection across the dosing period and subsequent follow-up.
+
 
 ```{r}
 
@@ -50,6 +52,8 @@ df <-
 
 ##### 16S
 
+We visualize the qPCR 16S results across visits and participants. For each participant, the median number of 16S copies per swab (log₁₀-transformed) is displayed as a heatmap, with participants on the y-axis and visit codes on the x-axis. The plot is stratified by study arm and site using nested facets.
+
 ```{r}
 #| fig-width: 10
 #| fig-height: 10
@@ -70,11 +74,14 @@ df |>
 ```
 ##### LBP strains
 
+We generate heatmaps of qPCR results for each study arm. For every participant and visit, the median number of copies per swab for each LBP strain is shown, with strain identity on the y-axis and visit code on the x-axis.
+
 ```{r}
 #| fig-width: 10
 #| fig-height: 15
 
-map(
+plots <- 
+  map(
   .x = df$arm |> unique() |> sort(),
   ~ df |> 
     filter(.feature != "16S", arm == .x) |> 
@@ -93,36 +100,29 @@ map(
 ```
 
 ```{r}
-#| fig-width: 12
-#| fig-height: 15
-
-map(
-  .x = df$arm |> unique() |> sort(),
-  ~ df |> 
-    filter(.feature != "16S", arm == .x) |> 
-    ggplot() +
-    aes(x = visit_code, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
-    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
-    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
-    geom_line(aes(group = .feature)) +
-    geom_point() +
-    scale_y_log10() +
-    expand_limits(y = 10^10) +
-    ggtitle(.x) +
-    theme(
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-    )
-)
-
+names(plots) <- df$arm |> unique() |> sort()
 ```
 
 
+::: panel-tabset
+```{r}
+#| results: asis
+#| fig-width: 10
+#| fig-height: 15
+
+plot_tabs(plots)
+```
+:::
+
+
+We plot longitudinal qPCR measurements for each participant and strain, stratified by study arm, site, and participant. The x-axis shows study days and the y-axis the median copies per swab (log₁₀ scale). Each line represents one LBP strain, with color indicating strain identity. Shaded background areas indicate treatment periods: red for oral metronidazole and yellow for LBP dosing. A dashed horizontal line marks the 10⁵ copies/swab threshold.
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 15
 
-map(
+plots <- 
+  map(
   .x = df$arm |> unique() |> sort(),
   ~ df |> 
     filter(.feature != "16S", arm == .x, study_day >= 0) |> 
@@ -136,8 +136,19 @@ map(
     ) +
     geom_rect(
       data = tibble(study_day = 0, copies_per_swab_med = NA), 
-      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+      xmin = 7.5, 
+      xmax = case_when(
+        .x == "LC-106-3" ~ 10.5,
+        .x == "LC-106-o" ~ 10.5,
+        TRUE ~ 14.5
+      ), 
+      ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
     ) +
+    # Rectangle jaune supplémentaire pour LC-106-o uniquement
+    {if(.x == "LC-106-o") geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 3.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+    )} +
     geom_line(aes(group = .feature)) +
     geom_point() +
     scale_y_log10() +
@@ -145,9 +156,26 @@ map(
     scale_x_continuous(breaks = seq(0, 35, by = 7)) +
     ggtitle(.x)
 )
-
 ```
+
+```{r}
+names(plots) <- df$arm |> unique() |> sort()
+```
+
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| fig-width: 10
+#| fig-height: 15
+
+plot_tabs(plots)
+```
+:::
+
+
 ##### LBP exposure
+
 
 
 ```{r}
@@ -191,6 +219,7 @@ df_summ <-
 ```{r}
 #| fig-height: 11
 #| fig-width: 7
+#| eval: false
 
 df_summ |> 
   filter(randomized) |> 
@@ -240,10 +269,11 @@ df_summ |>
 ```
 
 
-Comparison with self-declared exposure
+**Comparison with self-declared exposure.**
+
+Dots indicate whether participants reported inserting the study product on each day.
 
 ```{r}
-
 
 df_summ <- 
   df_summ |> 
@@ -257,8 +287,6 @@ df_summ <-
 ```
 
 
-
-
 ```{r}
 #| fig-height: 11
 #| fig-width: 7
@@ -297,7 +325,7 @@ df_summ |>
 
 ```
 
-
+Here we adjust for reported product losses, representing actual exposure (i.e., tablets that remained in place).
 
 ```{r}
 #| fig-height: 11
@@ -338,10 +366,9 @@ df_summ |>
 ```
 
 
-Comparison with applicator staining
+**Comparison with applicator staining**
 
 ```{r}
-
 
 df_summ <- 
   df_summ |> 
@@ -374,8 +401,9 @@ df_summ <-
 ```{r}
 #| fig-height: 11
 #| fig-width: 8
+#| eval: false
 
-df_summ |> 
+df_summ |>
   filter(randomized) |> 
   ggplot() +
   aes(x = visit_code, y = pid, fill = total_LBP |> log10()) +
@@ -520,6 +548,7 @@ df_summ <-
 ```{r}
 #| fig-height: 11
 #| fig-width: 7
+#| eval: false
 
 df_summ |> 
   filter(randomized) |> 
@@ -581,6 +610,13 @@ df_summ |>
   labs(caption = ".")
 
 
+```
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 7
+
 df_summ |> 
   filter(randomized) |> 
   ggplot() +
@@ -597,9 +633,10 @@ df_summ |>
     legend.position = "bottom", legend.direction = "horizontal"
   ) +
   labs(caption = ".")
-
-
 ```
+
+
+Here we look at the proportion of days exposed by qPCR (daily home swabs), among dosing days
 
 ```{r}
 
@@ -663,28 +700,6 @@ bind_rows(
   filter(mITT) |> 
   group_by(arm, site) |> 
   summarize(
-    mean_days_exposed = mean(n_days_exposed, na.rm = TRUE) |> round(1),
-    mean_prop_days_exposed = (100 * mean(prop_days_exposed, na.rm = TRUE)) |> round() |> str_c("%"),
-  ) |>  
-  select(-mean_days_exposed) |>
-  pivot_wider(names_from = arm, values_from = mean_prop_days_exposed) |> 
-  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average %") 
-
-```
-
-We add the CI (Student's CI) 
-
-```{r}
-
-bind_rows(
-  df_summ_pid |> filter(arm != "Pl"),
-  df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
-  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
-  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
-) |> 
-  filter(mITT) |> 
-  group_by(arm, site) |> 
-  summarize(
     n = sum(!is.na(prop_days_exposed)),
     mean_prop_days_exposed = mean(prop_days_exposed, na.rm = TRUE),
     sd_prop = sd(prop_days_exposed, na.rm = TRUE),
@@ -701,51 +716,7 @@ bind_rows(
 
 ```
 
-Using bootstrap's CI 
 
-```{r}
-
-boot_mean <- function(data, indices) {
-  d <- data[indices, ]
-  mean(d$prop_days_exposed, na.rm = TRUE)
-}
-
-boot_ci <- function(boot_obj) {
-  ci <- tryCatch(
-    boot::boot.ci(boot_obj, type = "perc"),
-    error = function(e) NULL
-  )
-  if (is.null(ci) || is.null(ci$percent)) {
-    return(c(NA, NA))
-  } else {
-    return(ci$percent[4:5])
-  }
-}
-
-df_summ_pid |> 
-  filter(arm != "Pl") |> 
-  bind_rows(
-    df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
-    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
-    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
-  ) |> 
-  filter(mITT) |> 
-  group_by(arm, site) |> 
-  nest() |> 
-  mutate(
-    boot = map(data, ~ boot::boot(.x, statistic = boot_mean, R = 1000)),
-    ci_vals = map(boot, boot_ci),
-    mean_prop = map_dbl(boot, ~ .x$t0),
-    ci_lower = map_dbl(ci_vals, ~ .x[1]),
-    ci_upper = map_dbl(ci_vals, ~ .x[2]),
-    mean_with_ci = str_c(percent(mean_prop, accuracy = 1), " (", percent(ci_lower, accuracy = 1), "–", percent(ci_upper, accuracy = 1), ")")
-  ) |> 
-  select(arm, site, mean_with_ci) |> 
-  pivot_wider(names_from = arm, values_from = mean_with_ci) |> 
-  ungroup() |> 
-  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average % with 95% bootstrap CI")
-
-```
 
 ```{r}
 

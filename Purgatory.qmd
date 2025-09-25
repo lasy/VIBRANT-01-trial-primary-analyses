@@ -4,6 +4,37 @@ format: html
 editor: source
 ---
 
+# R
+
+## viz and table fct 
+
+```{r}
+# make_title <-
+#   function(mae){
+#     str_c(ifelse(mae@metadata$data_source == "simulated", "Simulated", "Actual Study"), " Data as of ", mae@metadata$date)
+#   }
+
+
+# get_arm_colors <- function(){
+#   blue_hue <- 0.61
+#   green_hue <- 0.45
+#   c(
+#     "Pl" = "gray",
+#     "Blinded" = "gray",
+#     "LC-106-7" = hsv(h = blue_hue, s = 0.7, v = 0.5),
+#     "LC-106-3" = hsv(h = blue_hue, s = 0.55, v = 0.8),
+#     "LC-106-o" = hsv(h = blue_hue, s = 0.35, v = 1),
+#     "LC-115" = hsv(h = green_hue, s = 0.95, v = 0.9)
+#     )
+# }
+
+
+# get_origin_colors <- function(){
+#   c("SA" = "green3", "US" = "steelblue3", "Other" = "gray80")
+# }
+```
+
+
 # Loading data 
 
 ## 11/09/2025
@@ -32,6 +63,71 @@ editor: source
 ```
 
 # 03 secondary outcomes
+
+### 24/09
+
+#### Individual LBP strain 
+
+```{r}
+# visit_label = ifelse(visit != "screening", str_c(visit, " (W", study_week, ")"), visit |> as.character()) |> fct_reorder(visit |> as.numeric())
+
+LBP_strains |> 
+   mutate(
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |> 
+  filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  ggplot() +
+  aes(x = .feature, y = rel_ab, col = site, fill = site) +
+  # geom_point(alpha = 0.5, size = 0.5, position = position_dodge(width = 0.5)) +
+  # geom_violin(col = NA, alpha = 0.4) + # > TODO: check if it looks good - IT DOES NOT!
+  ggbeeswarm::geom_quasirandom(alpha = 0.5, size = 0.5, dodge.width = 0.5) +
+  # geom_boxplot(outlier.size = 0.5) +
+  # facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(LBP, strain_origin),
+    scales = "free_x", space = "free_x") + 
+  xlab("LBP strain") +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  scale_color_manual("Study\nsite", values = site_colors) +
+  scale_fill_manual("Study\nsite", values = site_colors) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) 
+
+
+g_relative_abundance <- 
+  LBP_strains |> 
+  mutate(
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric()), 
+    strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains")
+    ) |>
+  filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  ggplot() +
+  aes(x = .feature, y = rel_ab, col = site, fill = site) +
+  # geom_point(alpha = 0.5, size = 0.5) +
+  geom_boxplot(outlier.size = 0.7, alpha = 0.4) +
+  #facet_grid(visit_label ~ LBP + strain_origin , scales = "free_x", space = "free_x") +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(LBP, strain_origin),
+    scales = "free_x", space = "free_x") +
+  xlab("") +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  scale_color_manual(values = site_colors) +
+  scale_fill_manual(values = site_colors) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) 
+g_relative_abundance
+```
+
 
 ### 08/08 Microbiota trajectory
 
@@ -125,7 +221,346 @@ applicator <-
 
 ```
 
+# 05 - daily qPCR 
+
+### 24/09/2025
+
+
+```{r}
+#| fig-width: 12
+#| fig-height: 15
+
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x) |> 
+    ggplot() +
+    aes(x = visit_code, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+    geom_line(aes(group = .feature)) +
+    geom_point() +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    ggtitle(.x) +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
+)
+
+```
+
+```{r}
+map(
+  .x = df$arm |> unique() |> sort(),
+  ~ df |> 
+    filter(.feature != "16S", arm == .x, study_day >= 0) |> 
+    ggplot() +
+    aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+    geom_hline(yintercept = 10^5, lty = 2, col = "gray40") +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
+    ) +
+    geom_rect(
+      data = tibble(study_day = 0, copies_per_swab_med = NA), 
+      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+    ) +
+    geom_line(aes(group = .feature)) +
+    geom_point() +
+    scale_y_log10() +
+    expand_limits(y = 10^10) +
+    scale_x_continuous(breaks = seq(0, 35, by = 7)) +
+    ggtitle(.x)
+)
+
+```
+
+wo CI
+
+```{r}
+bind_rows(
+  df_summ_pid |> filter(arm != "Pl"),
+  df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    mean_days_exposed = mean(n_days_exposed, na.rm = TRUE) |> round(1),
+    mean_prop_days_exposed = (100 * mean(prop_days_exposed, na.rm = TRUE)) |> round() |> str_c("%"),
+  ) |>  
+  select(-mean_days_exposed) |>
+  pivot_wider(names_from = arm, values_from = mean_prop_days_exposed) |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average %") 
+```
+
+
+Using bootstrap's CI 
+
+```{r}
+
+boot_mean <- function(data, indices) {
+  d <- data[indices, ]
+  mean(d$prop_days_exposed, na.rm = TRUE)
+}
+
+boot_ci <- function(boot_obj) {
+  ci <- tryCatch(
+    boot::boot.ci(boot_obj, type = "perc"),
+    error = function(e) NULL
+  )
+  if (is.null(ci) || is.null(ci$percent)) {
+    return(c(NA, NA))
+  } else {
+    return(ci$percent[4:5])
+  }
+}
+
+df_summ_pid |> 
+  filter(arm != "Pl") |> 
+  bind_rows(
+    df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
+    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
+    df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+  ) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  nest() |> 
+  mutate(
+    boot = map(data, ~ boot::boot(.x, statistic = boot_mean, R = 1000)),
+    ci_vals = map(boot, boot_ci),
+    mean_prop = map_dbl(boot, ~ .x$t0),
+    ci_lower = map_dbl(ci_vals, ~ .x[1]),
+    ci_upper = map_dbl(ci_vals, ~ .x[2]),
+    mean_with_ci = str_c(percent(mean_prop, accuracy = 1), " (", percent(ci_lower, accuracy = 1), "–", percent(ci_upper, accuracy = 1), ")")
+  ) |> 
+  select(arm, site, mean_with_ci) |> 
+  pivot_wider(names_from = arm, values_from = mean_with_ci) |> 
+  ungroup() |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: average % with 95% bootstrap CI")
+
+```
+
 # 04 - supplementary analyses
+
+### 24/09/2025
+
+#### Nugen score & BV
+
+```{r}
+# nugent score for all visits 
+
+nugent_score <- 
+  mae@colData |> 
+  as_tibble() |> 
+  select(uid, pid, visit_code, study_day, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    metadata(mae)$visits_crfs_merged |> 
+      as_tibble() |> 
+      select(pid, visit_code, nugent_total_score),
+    by = c("pid", "visit_code")
+  ) |> 
+  # some pid x visit are duplicate but there is no data for the nugent score, so we remove the duplicate visit with no data for nugent score
+  group_by(pid, visit_code) |> 
+  arrange(is.na(nugent_total_score)) |>  
+  dplyr::slice(1) |>  
+  ungroup() |>
+  group_by(visit_code) |> 
+  mutate(any_Nugent = any(!is.na(nugent_total_score))) |> 
+  ungroup() |> 
+  filter(any_Nugent) |> 
+  group_by(pid) |>
+  mutate(
+    active_arm = arm != "Pl",
+    nugent_positive = nugent_total_score >= 7
+  ) |> 
+  ungroup()
+
+nugent_score |> 
+  filter(visit_code == "1100") |> 
+  ggplot()+ 
+  aes(x = nugent_total_score |> as.factor(), y = pid |> as.factor(), fill = nugent_positive |> as.factor()) +
+  geom_tile() +
+  scale_fill_manual(
+    name = "Nugent score >= 7",
+    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
+    na.value = "gray50"
+  ) + 
+  scale_y_discrete(drop = FALSE) |> 
+  labs(x = "Nugent score", y = "Participant ID", title = "Nugent score at visit 1100") + 
+  theme(axis.text.y = element_text(size = 4))
+  
+nugent_score |> 
+  ggplot()+ 
+  aes(x = visit_code, y = pid, fill = nugent_positive |> as.factor()) +
+  geom_tile() +
+  scale_fill_manual(
+    name = "Nugent score positive (>= 7)",
+    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
+    na.translate = FALSE
+  ) + 
+  labs(x = "Visit Code", y = "Participant ID") + 
+  theme(axis.text.y = element_text(size = 4))
+
+```
+
+This table should be the same as Table 3 in the paper, but it differs slightly: we have 6 for Pl and not 8, 1 and not 2 for LC-106-o and 2 and not 3 for LC-115. 
+I think the missing participants are participants with missing values for which we would have taken the value from the previous visit.
+
+```{r}
+
+#nugent score of active arm at visit 1100 
+nugent_score |> 
+  filter(visit_code == "1100") |> #%in% c("1100", "1500", "2120")
+  group_by(arm) |> #visit_code
+  summarise(
+    n = n(),
+    n_missing = sum(is.na(nugent_positive)), 
+    n_positive = sum(nugent_positive, na.rm = TRUE),
+    p = n_positive / n,
+    CI = binom::binom.confint(n_positive, n, method = "exact")
+  ) |>
+  mutate(
+    pct = round(p * 100, 1),
+    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
+  ) |> 
+  select(-CI, -p) |> 
+  gt() |> 
+  tab_header(
+    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 1100 (week1)"
+  ) |>
+  cols_label(
+    n = "N participants",
+    n_missing = "n participants without Nugent score",
+    n_positive = "n (%) participants with Nugent score ≥ 7",
+    pct = "Percentage",
+    CI_text = "95% CI"
+  )
+
+```
+
+#### rBV
+
+> Question : how is define recurrence (at week 5, week 12) ? The participant must have been cured between "after MTZ" and week 5 (12) ? 
+
+```{r}
+# Active arms vs. placebo, 
+# at 5 weeks recurrence was 33% vs. 67% (p = 0.05) -> OK 
+# at 12 weeks recurrence was 44% vs. 70% (p = 0.13) -> ?
+
+# nugent_score |> 
+#   filter(visit_code != "0000") |>  # remove visit 0 
+#   group_by(pid) |> 
+#   mutate(n_cured = sum(!nugent_positive, na.rm = TRUE)) |> 
+#   ungroup() |> 
+#   filter(visit_code == "1500", active_arm) |> 
+#   dplyr::count(nugent_positive, n_cured)
+```
+
+#### qPCR
+
+
+(To remove?) 
+
+2. At least a strain detected with > 10^7 copie per swab  
+
+We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to define a binary outcome (`outcome`), which is set to TRUE when the strain was detected above 10^7 copies per swab.
+
+We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if any LBP strain was detected above the threshold at that visit.
+
+```{r}
+
+detected_qPCR <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["qPCR"]] |> 
+      as_tibble() |> 
+      select(.sample, .feature, copies_per_swab_med) |> 
+      filter(.feature != "16S") |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) 
+  ) |> 
+  mutate(outcome = ifelse(copies_per_swab_med > 1e7, TRUE, FALSE)) |> 
+  group_by(arm, pid, visit_code) |>
+  summarise(detected = any(outcome, na.rm = TRUE), .groups = "drop")
+
+```
+
+Finally, we restricted the analysis to participants randomized to an active arm (i.e., excluding placebo) and counted the number of participants with at least one LBP strain detected at visits 1300 and 2120.
+
+```{r}
+
+detected_qPCR |> 
+  filter(visit_code %in% c("1200","2120")) |> # C'est stupide, mais V3, c'est 1200 
+  filter(arm != "Pl") |> 
+  group_by(visit_code) |>
+  summarise(
+    n    = sum(detected),
+    tot_participant = n_distinct(pid),
+    .groups = "drop"
+  )
+
+```
+
+
+
+3. Total of LBP strains detected with > 10^7 copie per swab
+
+We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to calculate the total copies per swab for LBP strains per sample (`tot_copie_swab`). 
+
+We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if `tot_copie_swab` was above 10^7 at that visit.
+
+
+```{r}
+
+detected_qPCR_bis <-
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |> 
+  left_join(
+    mae[["qPCR"]] |> 
+      as_tibble() |> 
+      select(.sample, .feature, copies_per_swab_med) |> 
+      filter(.feature != "16S") |> 
+      dplyr::left_join(
+        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
+        by = join_by(.sample == uid)
+      ) 
+  ) |> 
+  group_by(arm, mITT, pid, visit_code) |> 
+  summarise(tot_copie_swab = sum(copies_per_swab_med, na.rm = TRUE),  
+            detected = tot_copie_swab > 1e7, 
+            .groups = "drop") 
+
+```
+
+```{r}
+
+detected_qPCR_bis |> 
+  filter(visit_code %in% c("1200","2120")) |> # C'est stupide, mais V3, c'est 1200 
+  filter(arm != "Pl") |> 
+  group_by(visit_code) |>
+  summarise(
+    n    = sum(detected),
+    tot_participant = n_distinct(pid),
+    .groups = "drop"
+  )
+
+
+```
+
+
 
 ### 10/09/2025
 

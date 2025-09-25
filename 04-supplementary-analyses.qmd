@@ -19,232 +19,12 @@ editor: source
 ---
 
 
-### Long terme colonization 
-
-"Among people with detection of the LBP strains during the first 5 weeks, approximately 40-60% still had detection at week 12 (Figure 3b), demonstrating prolonged durability despite a relatively short initial dosing."
-
-Among participants colonized by week 5, how many are still colonized at week 12?
-
-```{r}
-
-# already exists
-
-col_by_week5 <- 
-  mae@colData |> as_tibble() |> 
-  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_LBP_mg"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code == "1500", .feature == "colonized_LBP_by_mg")
-  ) |> 
-  mutate(LBP_colonization_by_week5 = outcome |> replace_na(FALSE)) 
-
-
-col_at_week12 <- 
-  mae@colData |> as_tibble() |> 
-  dplyr::select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["col_LBP_mg"]] |> 
-      as_tibble() |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> dplyr::select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) |> 
-      dplyr::filter(visit_code == "2120", .feature == "colonized_LBP_at_mg")
-  ) |> 
-  mutate(LBP_colonization_at_week12 = outcome |> replace_na(FALSE)) 
-
-
-col_still_col <- 
-  col_by_week5 |> 
-  dplyr::select(pid, site, arm, randomized, ITT, mITT, PP, LBP_colonization_by_week5) |> 
-  left_join(
-    col_at_week12 |> dplyr::select(pid, LBP_colonization_at_week12 ),
-    by = c("pid")
-  )
-
-```
-
-
-
-```{r}
-
-summary_col_still_col <-
-  bind_rows(
-    # by site and arms
-    col_still_col |> 
-      filter(LBP_colonization_by_week5) |>
-      group_by(site, arm) |> 
-      summarize(
-        n = n(),  # total with colonization at week 5
-        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-        .groups = "drop"
-      ),
-    # combining sites, by arm
-    col_still_col |> 
-      filter(LBP_colonization_by_week5) |>
-      group_by(arm) |> 
-      summarize(
-        n = n(),  # total with colonization at week 5
-        n_success = sum(LBP_colonization_at_week12),  # still colonized at week 12
-        .groups = "drop"
-      ) |> 
-      mutate(site = "CAP & MGH")
-  ) |> 
-  mutate(
-    site = site |> fct_inorder(),
-    arm = arm |> fct_expand("All arms", "All active arms")
-    )
-
-summary_col_still_col <- 
-  summary_col_still_col |> 
-  bind_rows(
-    # overall by site, all arms
-    summary_col_still_col |> 
-      group_by(site) |> 
-      summarize(
-        n = sum(n),  # total with colonization at week 5
-        n_success = sum(n_success),  # still colonized at week 12
-        .groups = "drop"
-      ) |> 
-      mutate(arm = "All arms" |> factor(levels = summary_col_still_col$arm |> levels())),
-    # overall by site, all active arms
-    summary_col_still_col |>
-      filter(arm != "Pl") |>
-      group_by(site) |> 
-      summarize(
-        n = sum(n),  # total with colonization at week 5
-        n_success = sum(n_success),  # still colonized at week 12
-        .groups = "drop"
-      )  |> 
-      mutate(arm = "All active arms" |> factor(levels = summary_col_still_col$arm |> levels()))
-  )
-
-summary_col_still_col <- 
-  summary_col_still_col |> 
-  mutate(
-    p_col_stil_col = n_success / n,
-    CI = binom::binom.confint(n_success, n, method = "exact")
-  )
-
-```
-
-
-```{r}
-
-table_still_col <- 
-  summary_col_still_col |> 
-  mutate(
-    N_per_site_and_arm = str_c("N = ", n),
-    LBP_strain_detected = str_c(n_success, " (", round(p_col_stil_col * 100)," %)"),
-    CI_text = str_c(round(CI$lower * 100), "% - ", round(CI$upper * 100), "%")
-  ) |> 
-  dplyr::select(
-    site, arm, N_per_site_and_arm, LBP_strain_detected, CI_text
-  ) |> 
-  pivot_longer(-c(site, arm)) |>
-  mutate(
-    name = 
-      case_when(
-        name == "N_per_site_and_arm" ~ "N participants colonized by week 5",
-        name == "LBP_strain_detected" ~ "n (%) participants\nwith LBP strain detected at week 12",
-        name == "CI_text" ~ "95% CI"
-      )
-  ) |>
-  arrange(arm) |> 
-  pivot_wider(
-    id_cols = c(site, name), 
-    names_from = arm,
-    values_from = value, values_fill = ""
-    ) |> 
-  arrange(site)
-
-```
-
-```{r}
-
-table_still_col |> 
-  group_by(site) |> 
-  gt(
-    caption = "Colonization at week 12 among participants colonized by week 5 by arm", 
-    row_group_as_column = TRUE
-    ) |> 
-  cols_width(
-    "name" ~ px(200),
-    everything() ~ px(120)
-  ) |> 
-  cols_align(
-    align = "center", 
-    columns = c(Pl, `LC-106-7`, `LC-106-3`, `LC-106-o`, `LC-115`, `All arms`, `All active arms`)
-  ) |> 
-  cols_label(
-    name = "",
-    Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
-    `All active arms` = "All active<br>arms",
-    .fn = md
-  )
-
-```
-
-
-
-
-Plot (Figure 3b)
-
-```{r}
-#| fig-width: 6
-#| fig-height: 4
-
-g_long_terme_col <- 
-  summary_col_still_col |> 
-  filter(!(arm %in% c("Pl", "All arms"))) |> 
-  arrange(arm) |> 
-  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
-  ggplot() +
-  aes(x = arm, y = p_col_stil_col, col = site) +
-  geom_linerange(
-    aes(ymin = CI$lower, ymax = CI$upper), 
-    linewidth = 1.5, alpha = 0.5, lineend = "round",
-    position = position_dodge(width = 0.5)
-    ) +
-  geom_point(position = position_dodge(width = 0.5), size = 3) +
-  scale_color_manual("Study site", values = c(site_colors, c("CAP & MGH" = "gray30"))) +
-  xlab("") + 
-  scale_y_continuous(
-    name = "% participants colonized by week 5\nwith LBP strain detected at week 12",
-    labels = scales::percent_format(accuracy = 1)
-  ) +
-  theme(
-    panel.grid.major.x = element_blank()
-    # axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-
-g_long_terme_col
-
-```
-
-
-
 ### Applicator staining
 
-#### Data used for analysis
+We analyze returned applicators and staining results to assess adherence to study product use.
+We use data from `participant_crfs_merged` stored in the `@metadata` slot of the `mae` object, which contains data from CRF23 (returned applicators) and CRF46 (staining results). We also use the `exposures` table to obtain information on study product use.
 
-We load data on returned applicators from CRF23 and on staining results from CRF 46. 
-We also load the `exposures` table to obtain information on study product use. 
-
-From these three tables, we create the `applicator` table, which includes only participants from the mITT population.
+From these, we create the `applicator` table, which includes only participants from the mITT population.
 
 ```{r}
 
@@ -288,7 +68,7 @@ applicator <-
 
 
 
-We also that two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
+We note that two participants returned eight applicators. In both cases, comments explain that they had received a spare applicator:
 
 *   Participant 068-20-0425 reported taking the spare applicator out of its wrapping and placing it in the return bag without using or washing any applicators.
 
@@ -492,20 +272,16 @@ applicator |>
 
 
 
-### Time since last dose in 7-days active arms (LC-106-7, LC-115)
+### Interval between last dose and week 2 clinic visit in active arms (LC-106-7, LC-115)
 
-We compute this time based on self-reported time of last study product use (daily - CRF plate 32/33) 
--> date/time of last study product = use the crf 32/33 `visit_day` + answer to when? (early morning, etc.)
--> swab time = use `study_day` of the weekly visit.
+We document the time between the last dose taken prior to the in-person visit at week 2 and the swab collected at that visit. This is relevant because the primary outcome is detection of the LBP strain at the week 2 visit, and the time since last dose may influence the likelihood of detection.
 
+Information on the self-reported time of last study product use comes from `exposures`, while the study day of the week 2 in-person visit is taken from `visits_crfs_merged.`
 
-To compute the time between the last dose taken prior to the in-person visit at week 2, we use information from three sources: crf32 for the time of insertion of the study product, the exposure table for the date of the last dose, and the visits_crfs_merged table for the study day of the week 2 in-person visit.
-
-We create category of the time of the last study product : 
-
-*   `same day` : last dose taken on the same day as the visit (before 6 p.m.)
-*   `day before` : last dose taken the day before the visit 
-*   `more thean 1 day` : last dose taken more than one day as the visit
+We define the following categories for the timing of the last study product use:
+-   "same day": last dose taken on the same day as the visit (before 6 p.m.)
+-   "day before": last dose taken the day before the visit
+-   "more than 1 day": last dose taken more than one day before the visit
 
 
 ```{r}
@@ -598,16 +374,11 @@ study_prod_time |>
 ```
 
 
-### Sensitivity analyses 
+### Dominance of LBP strains at visits remote from dosing 
 
-See "At **98** of these visits remote from dosing, where an LBP strain was detected by metagenomics, LBP strains made up > 50% of the community in **85** (**87**%), suggesting that if the LBP strains were retained they usually established dominance."
+To assess whether colonization typically reflected dominance, we examined the composition of samples from participants in active arms who achieved the primary outcome at visits conducted after product use (weeks 3–5 for LC-106-7 and LC-115; weeks 2–5 for LC-106-o and LC-106-3). 
 
-We take the "colonized at" data from the `col_LBP_mg` SE. We filter for participants in active arms and for visits remote from dosing
-
-*   Week 3 to 5 for LC-106-7 and LC-115
-*   Week 2 to 5 for LC-106-o and LC-106-3
-
-Among participants who achieved the primary outcome, LBP strains made up >= 50% in YY
+For each colonized sample, we calculated the total relative abundance of LBP strains based on metagenomic data. We then determined the proportion of samples in which LBP strains accounted for at least 50% of the community.
 
 
 ```{r}
@@ -681,11 +452,11 @@ col_at |>
 
 ### LBP colonization in participants with BV post-MTZ
 
-see "After oral metronidazole treatment, 22/70 (30%) people still had a Nugent score of 7 or higher, indicating a failure to resolve BV. Among the 16 of these people exposed to LBP, ZZ had a detectable LBP strain identified after treatment by metagenomics, and TT by qPCR during treatment." 
+We assessed treatment response by Nugent score at the first visit following oral metronidazole treatment (visit 1100). Nugent scores were extracted from `visits_crfs_merged` and a binary variable was created to classify participants as BV positive (nugent_total_score ≥ 7) or BV negative (< 7). 
 
-The Nugent score is available in CRF14. We are interested in the Nugent score value at the visit following metronidazole treatment (visit 1100).
+We then estimated the number and proportion of participants who remained BV positive post-metronidazole, overall and by treatment arm.
 
-We first create a table containing the Nugent score for all participants at all visits. We then create a variable `nugent_positive`, which is `TRUE` if `nugent_total_score >= 7` and `FALSE` otherwise. We also create a variable `active_arm` to group participant by active arm (i.e. LC106-o, LC-106-7, LC-106-3, LC-115) *vs* Placebo 
+
 
 ```{r}
 # nugent score for all visits 
@@ -727,33 +498,6 @@ nugent_score <-
 #| fig-width: 8
 
 nugent_score |> 
-  filter(visit_code == "1100") |> 
-  ggplot()+ 
-  aes(x = nugent_total_score |> as.factor(), y = pid |> as.factor(), fill = nugent_positive |> as.factor()) +
-  geom_tile() +
-  scale_fill_manual(
-    name = "Nugent score >= 7",
-    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
-    na.value = "gray50"
-  ) + 
-  scale_y_discrete(drop = FALSE) |> 
-  labs(x = "Nugent score", y = "Participant ID", title = "Nugent score at visit 1100") + 
-  theme(axis.text.y = element_text(size = 4))
-  
-nugent_score |> 
-  ggplot()+ 
-  aes(x = visit_code, y = pid, fill = nugent_positive |> as.factor()) +
-  geom_tile() +
-  scale_fill_manual(
-    name = "Nugent score positive (>= 7)",
-    values = c("TRUE" = "lightblue", "FALSE" = "lightgray"),
-    na.translate = FALSE
-  ) + 
-  labs(x = "Visit Code", y = "Participant ID") + 
-  theme(axis.text.y = element_text(size = 4))
-
-  
-nugent_score |> 
   ggplot()+ 
   aes(x = visit_code, y = pid, fill = nugent_total_score) +
   geom_tile() +
@@ -766,9 +510,6 @@ nugent_score |>
 
 
 ```
-
-
-
 
 
 ```{r}
@@ -826,46 +567,13 @@ tmp |>
   
 ```
 
-This table should be the same as Table 3 in the paper, but it differs slightly: we have 6 for Pl and not 8, 1 and not 2 for LC-106-o and 2 and not 3 for LC-115. 
-I think the missing participants are participants with missing values for which we would have taken the value from the previous visit.
 
-```{r}
-
-#nugent score of active arm at visit 1100 
-nugent_score |> 
-  filter(visit_code == "1100") |> #%in% c("1100", "1500", "2120")
-  group_by(arm) |> #visit_code
-  summarise(
-    n = n(),
-    n_missing = sum(is.na(nugent_positive)), 
-    n_positive = sum(nugent_positive, na.rm = TRUE),
-    p = n_positive / n,
-    CI = binom::binom.confint(n_positive, n, method = "exact")
-  ) |>
-  mutate(
-    pct = round(p * 100, 1),
-    CI_text = str_c("(", round(CI$lower * 100, 1), "%–", round(CI$upper * 100, 1), "%)")
-  ) |> 
-  select(-CI, -p) |> 
-  gt() |> 
-  tab_header(
-    title = "Proportion of Participants with Nugent Score ≥ 7 at Visit 1100 (week1)"
-  ) |>
-  cols_label(
-    n = "N participants",
-    n_missing = "n participants without Nugent score",
-    n_positive = "n (%) participants with Nugent score ≥ 7",
-    pct = "Percentage",
-    CI_text = "95% CI"
-  )
-
-```
 
 ### rBV by colonization status
 
 In this section, we are investigating whether LBP colonization is protective of rBV.
 
-So, we only include participants who were BV-cured post-MTZ, then count the number and proportions of participants who had rBV among those who met the primary outcome and those who did not.
+We only include participants who were BV-cured post-MTZ, then count the number and proportions of participants who had rBV among those who met the primary outcome and those who did not.
 
 
 ```{r}
@@ -895,7 +603,6 @@ rBV_stats <-
     nugent_score |> 
       select(pid, visit_code, nugent_positive) |> 
       filter(as.numeric(visit_code) > 1100, as.numeric(visit_code) <= 2120) |> 
-      # QUESTION for line above: should it be any time after the post-MTZ visit or anytime between week 5 and 12???
       group_by(pid) |> 
       summarize(
         BV_by_week12 = any(nugent_positive, na.rm = TRUE),
@@ -933,10 +640,6 @@ rBV_stats |>
 
 
 
-
-See "*If we combine all active arms vs. placebo, at 5 weeks recurrence was 33% vs. 67% (p = 0.05) and at 12 weeks 44% vs. 70% (p = 0.13).  Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY (16/45) vs. YY/YY (25/48) who did not colonize (p = YY).*"
-
-
 ```{r}
 
 
@@ -944,7 +647,7 @@ rBV_stats <-
   # we first define for each mITT participant whether they were BV-cured or not post-MTZ by Nugent
   nugent_score |> 
   select(-any_Nugent, -nugent_positive) |> 
-  filter(visit_code == "1100") |> 
+  filter(visit_code == "1100", mITT) |> 
   mutate(BV_cure_post_MTZ = nugent_total_score < 7) |> 
   # we then specify for each of these participants whether they met the criteria for the primary endpoint of LBP colonization by week 5
   left_join(
@@ -964,7 +667,6 @@ rBV_stats <-
     nugent_score |> 
       select(pid, visit_code, nugent_positive) |> 
       filter(as.numeric(visit_code) > 1100, as.numeric(visit_code) <= 2120) |> 
-      # QUESTION for line above: should it be any time after the post-MTZ visit or anytime between week 5 and 12???
       group_by(pid) |> 
       summarize(
         BV_by_week12 = any(nugent_positive, na.rm = TRUE),
@@ -983,23 +685,6 @@ rBV_stats |> filter(active_arm) |> dplyr::count(active_arm, LBP_colonization_by_
 
 
 
-
-
-> Question : how is define recurrence (at week 5, week 12) ? The participant must have been cured between "after MTZ" and week 5 (12) ? 
-
-```{r}
-# Active arms vs. placebo, 
-# at 5 weeks recurrence was 33% vs. 67% (p = 0.05) -> OK 
-# at 12 weeks recurrence was 44% vs. 70% (p = 0.13) -> ?
-
-# nugent_score |> 
-#   filter(visit_code != "0000") |>  # remove visit 0 
-#   group_by(pid) |> 
-#   mutate(n_cured = sum(!nugent_positive, na.rm = TRUE)) |> 
-#   ungroup() |> 
-#   filter(visit_code == "1500", active_arm) |> 
-#   dplyr::count(nugent_positive, n_cured)
-```
 
 ```{r}
 col_by_week5 <- 
@@ -1094,9 +779,7 @@ nugent_score |>
   
 ```
 
-Participants who achieved the primary outcome of LBP detection were less likely to have BV recurrence during the 12 week follow up: YY/YY vs. YY/YY who did not colonize (p = YY).
 
-> TODO : BV recurrence : il faut avoir été cured pour avoir une BC recurrence Cured quand ? n'importe quand entre MTZ et w12 ? 
 
 ```{r}
 
@@ -1131,10 +814,10 @@ nugent_score |>
 
 ### LBP Colonization dominance
 
-See *When the LBP isolates were detected they were most often the dominant species in the community*
+We first assessed whether LBP strains, when detected by metagenomic sequencing, typically established dominance in the vaginal microbiota. For each colonized sample, L. crispatus relative abundance was calculated, and dominance was defined as L. crispatus representing more than 50% of the total community. 
 
-Qu'est ce qu'on entend par détecté ? Metagenomics ou qPCR ? A un niveau de 5% ? 
-Primary outcome ? 
+We then investigated whether dominance by LBP strains was associated with a reduced risk of recurrent BV. Colonization outcomes were linked to Nugent scores collected at follow-up visits, and we compared the prevalence of BV (Nugent ≥ 7) among participants with or without LBP dominance at week 5. Results suggest that participants who achieved LBP strain dominance were less likely to experience recurrent BV.
+
 
 ```{r}
 
@@ -1179,9 +862,6 @@ rel_abs |>
 
 ```
 
-See *Additionally, if a participant established L. crispatus dominance with the LBP strains, they had a significantly lower chance of recurrent BV *
-
-At any time ? 
 
 ```{r}
 #| fig-height: 6
@@ -1237,7 +917,8 @@ tmp |>
 
 ### LBP detectable at week 12
 
-See "*However, an ideal product would durably colonize the majority of people, and given that LBP strains were detectable in only 34% of active arm participants at 12 weeks this product still needs optimization*"
+To evaluate the durability of colonization, we assessed the presence of LBP strains at the week 12 visit (visit 2120) among participants in the active arms. Detection was defined by metagenomic sequencing as the presence of any LBP strain with non-zero relative abundance. 
+
 
 ```{r}
 rel_abs |> 
@@ -1254,9 +935,10 @@ rel_abs |>
 ```
 
 
-### LBP detection at week3 qPCR
+### LBP detection at week 3 and 12 by qPCR
 
-See "When using a more sensitive, but less specific, qPCR, we detected LBP strains at > 107 copies/swab in YY/71 exposed people at week 2, the visit just after product cessation, and YY/71 exposed people at V9, 12 weeks after product use.". 
+As a complementary and more sensitive assay, we assessed LBP strain detection by qPCR. Detection was defined as the concurrent observation of Cq values for at least two LBP strains at the same visit.
+
 
 ```{r}
 
@@ -1317,106 +999,12 @@ detected_at_week12_qPCR |>
 ```
 
 
-(To remove?) 
-
-2. At least a strain detected with > 10^7 copie per swab  
-
-We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to define a binary outcome (`outcome`), which is set to TRUE when the strain was detected above 10^7 copies per swab.
-
-We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if any LBP strain was detected above the threshold at that visit.
-
-```{r}
-
-detected_qPCR <-
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["qPCR"]] |> 
-      as_tibble() |> 
-      select(.sample, .feature, copies_per_swab_med) |> 
-      filter(.feature != "16S") |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) 
-  ) |> 
-  mutate(outcome = ifelse(copies_per_swab_med > 1e7, TRUE, FALSE)) |> 
-  group_by(arm, pid, visit_code) |>
-  summarise(detected = any(outcome, na.rm = TRUE), .groups = "drop")
-
-```
-
-Finally, we restricted the analysis to participants randomized to an active arm (i.e., excluding placebo) and counted the number of participants with at least one LBP strain detected at visits 1300 and 2120.
-
-```{r}
-
-detected_qPCR |> 
-  filter(visit_code %in% c("1200","2120")) |> # C'est stupide, mais V3, c'est 1200 
-  filter(arm != "Pl") |> 
-  group_by(visit_code) |>
-  summarise(
-    n    = sum(detected),
-    tot_participant = n_distinct(pid),
-    .groups = "drop"
-  )
-
-```
-
-3. Total of LBP strains detected with > 10^7 copie per swab
-
-We analyzed the `qPCR` SummarizedExperiment from the MAE. For each LBP strain, we used the variable `copies_per_swab_med` (the median across technical replicates) to calculate the total copies per swab for LBP strains per sample (`tot_copie_swab`). 
-
-We then summarized this information at the participant × visit level: the variable `detected` is set to TRUE if `tot_copie_swab` was above 10^7 at that visit.
-
-
-```{r}
-
-detected_qPCR_bis <-
-  mae@colData |> as_tibble() |> 
-  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
-  distinct() |> 
-  filter(randomized, mITT) |> 
-  left_join(
-    mae[["qPCR"]] |> 
-      as_tibble() |> 
-      select(.sample, .feature, copies_per_swab_med) |> 
-      filter(.feature != "16S") |> 
-      dplyr::left_join(
-        mae@colData |> as_tibble() |> select(uid, pid, visit_code),
-        by = join_by(.sample == uid)
-      ) 
-  ) |> 
-  group_by(arm, mITT, pid, visit_code) |> 
-  summarise(tot_copie_swab = sum(copies_per_swab_med, na.rm = TRUE),  
-            detected = tot_copie_swab > 1e7, 
-            .groups = "drop") 
-
-```
-
-```{r}
-
-detected_qPCR_bis |> 
-  filter(visit_code %in% c("1200","2120")) |> # C'est stupide, mais V3, c'est 1200 
-  filter(arm != "Pl") |> 
-  group_by(visit_code) |>
-  summarise(
-    n    = sum(detected),
-    tot_participant = n_distinct(pid),
-    .groups = "drop"
-  )
-
-
-```
-
-
 ### LBP detection week 3 (1300) and week 4_12 - qPCR
 
-See "The Lactin-V strain is detectable in 69-79% by qPCR in the week after cessation of product, and after 4-12 weeks of off-product follow up this proportion was 47-48%.22,24 We saw a similar proportion of detected LBP strains by qPCR in the week after cessation of product, and after an additional 7 weeks off product."
+LBP detection was assessed by qPCR, defined as the presence of Cq values for at least two LBP strains at the same visit. We computed the proportion of participants with detectable LBP strains at week 3 (visit 1300, one week after the end of dosing) and at week 9 (visit 1900, after 7 weeks off product), both overall and excluding placebo participants.
+
 
 ```{r}
-# by qPCR 
 
 # one week after LBP = 1300
 
