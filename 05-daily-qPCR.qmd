@@ -288,8 +288,8 @@ df_summ <-
 
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 7
+#| fig-height: 15
+#| fig-width: 10
 
 df_summ |> 
   filter(randomized) |> 
@@ -328,8 +328,8 @@ df_summ |>
 Here we adjust for reported product losses, representing actual exposure (i.e., tablets that remained in place).
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 7
+#| fig-height: 15
+#| fig-width: 10
 
 df_summ |> 
   filter(randomized) |> 
@@ -399,8 +399,8 @@ df_summ <-
 
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 8
+#| fig-height: 15
+#| fig-width: 10
 #| eval: false
 
 df_summ |>
@@ -467,8 +467,8 @@ df_summ |>
 
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 8
+#| fig-height: 15
+#| fig-width: 10
 
 df_summ |> 
   filter(randomized) |> 
@@ -546,8 +546,8 @@ df_summ <-
 
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 7
+#| fig-height: 15
+#| fig-width: 10
 #| eval: false
 
 df_summ |> 
@@ -614,8 +614,8 @@ df_summ |>
 
 
 ```{r}
-#| fig-height: 11
-#| fig-width: 7
+#| fig-height: 15
+#| fig-width: 10
 
 df_summ |> 
   filter(randomized) |> 
@@ -716,7 +716,7 @@ bind_rows(
 
 ```
 
-
+We group participants by the proportion of days exposed by qPCR (daily home swabs), among dosing days: >50%, >0% to ≤50%, and 0%. We then summarize the number and percentage of participants in each group, along with 95% confidence intervals, stratified by study arm.
 
 ```{r}
 
@@ -789,21 +789,12 @@ exposed_qpcr <-
 
 exposed_qpcr
 
-# ggsave(
-#   exposed_qpcr, filename = "figures/Supp_Figure3_exposed_qpcr.pdf",
-#   width = 12, height = 7.5, dpi = 300, units = "in"
-# )
-
-# Hello Laura, it's Laura :)
-# Thanks for making this one as well.
-# I made a few tweaks and proposed an alternative or additional below - you can include which ever you prefer in the manuscript (yours is better in my opinion, but I "needed" (!! :D) to see the data :)
-
 ```
 
 
 ```{r}
 #| fig-height: 4
-#| fig-width: 8
+#| fig-width: 7
 
 # supplementary figure 3
 
@@ -1105,9 +1096,9 @@ g_trajectories_appl_exp
 ```
 
 
-#### all qPCR data (weekly swabs + daily home swabs)
+#### All qPCR data (weekly swabs + daily home swabs)
 
-
+We combined the weekly clinic swabs (old data) and daily home swabs (new data) qPCR data to visualize the trajectories of LBP strains over time, stratified by study arm and site.
 
 ```{r}
 
@@ -1139,6 +1130,7 @@ df <-
 
 ```
 
+We first look at the 16S target. 
 
 ```{r}
 #| fig-width: 10
@@ -1177,13 +1169,14 @@ df |>
 
 ```
 
-
+Now we look at the LBP strains only.
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 15
 
-map(
+plots <- 
+  map(
   .x = df$arm |> unique() |> sort(),
   ~ df |> 
     filter(.feature != "16S", arm == .x) |> 
@@ -1200,12 +1193,27 @@ map(
 
 ```
 
+```{r}
+names(plots) <- df$arm |> unique() |> sort()
+```
+
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| fig-width: 10
+#| fig-height: 15
+
+plot_tabs(plots)
+```
+:::
 
 ```{r}
 #| fig-width: 12
 #| fig-height: 15
+#| eval: false
 
-map(
+  map(
   .x = df$arm |> unique() |> sort(),
   ~ df |> 
     filter(.feature != "16S", arm == .x) |> 
@@ -1228,52 +1236,57 @@ map(
 
 
 
-
-
-
-
-
-
-
-
-
-
 ```{r}
 #| fig-width: 12
 #| fig-height: 15
 
-map(
-  .x = df$arm |> unique() |> sort(),
-  ~ df |> 
-    filter(.feature != "16S", arm == .x, study_day >= 0) |> 
-    ggplot() +
-    aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
-    ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
-    geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
-    geom_rect(
-      data = tibble(study_day = 0, copies_per_swab_med = NA), 
-      xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
-    ) +
-    geom_rect(
-      data = tibble(study_day = 0, copies_per_swab_med = NA), 
-      xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
-    ) +
-    geom_line(aes(group = .feature)) +
-    geom_point(aes(shape = data_source)) +
-    scale_y_log10() +
-    expand_limits(y = 10^10) +
-    scale_x_continuous(breaks = seq(0, 35, by = 7)) +
-    ggtitle(.x)
-)
+plots <- 
+  map(
+    .x = df$arm |> unique() |> sort(),
+    ~ df |> 
+      filter(.feature != "16S", arm == .x, study_day >= 0) |> 
+      ggplot() +
+      aes(x = study_day, y = copies_per_swab_med, col = LBP ) + #  |> asinh()
+      ggh4x::facet_nested(site + pid ~ .) + # scales = "free", space = "free"
+      geom_hline(yintercept = 10^6, lty = 2, col = "gray") +
+      geom_rect(
+        data = tibble(study_day = 0, copies_per_swab_med = NA), 
+        xmin = 0.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "red", col = NA
+      ) +
+      geom_rect(
+        data = tibble(study_day = 0, copies_per_swab_med = NA), 
+        xmin = 7.5, xmax = 14.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
+      ) +
+      geom_line(aes(group = .feature)) +
+      geom_point(aes(shape = data_source)) +
+      scale_y_log10() +
+      expand_limits(y = 10^10) +
+      scale_x_continuous(breaks = seq(0, 35, by = 7)) +
+      ggtitle(.x)
+  )
 
 ```
 
 
+```{r}
+names(plots) <- df$arm |> unique() |> sort()
+```
 
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| fig-width: 10
+#| fig-height: 15
+
+plot_tabs(plots)
+```
+:::
 
 ```{r}
 #| fig-width: 12
 #| fig-height: 15
+#| eval: false
 
 map(
   .x = df$arm |> unique() |> sort(),

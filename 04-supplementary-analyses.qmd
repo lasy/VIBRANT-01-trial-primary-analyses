@@ -420,35 +420,6 @@ col_at |>
 
 ```
 
-```{r}
-
-# old
-
-# propLBP_week3_5 <- 
-#   mae[["mg"]] |> 
-#   as_tibble() |> 
-#   dplyr::left_join(
-#     mae@colData |> as_tibble() |> select(uid, pid, arm, mITT, visit_code),
-#     by = join_by(.sample == uid)
-#   ) |>
-#   filter(mITT) |> 
-#   filter(arm %in% c("LC-106-7", "LC-115")) |> 
-#   filter(visit_code %in% c("1300", "1400", "1500")) |> 
-#   filter(!is.na(LBP)) |> 
-#   group_by(pid, visit_code) |>
-#   summarise(
-#     prop_tot_LBP = sum(rel_ab, na.rm = TRUE),
-#     .groups = "drop"
-#   ) 
-# 
-# propLBP_week3_5|>
-#   dplyr::count(prop_tot_LBP > 0)
-# 
-# propLBP_week3_5 |>
-#   dplyr::count(prop_tot_LBP > 0.5)
-
-```
-
 
 ### LBP colonization in participants with BV post-MTZ
 
@@ -544,7 +515,6 @@ tmp <-
   nugent_score |>
   filter(visit_code == "1100") |> 
   filter(active_arm) |>
-  # filter(nugent_positive | is.na(nugent_positive)) |> #  
   left_join(
     # add mg data to see how many had detectable LBP strain post-MTZ
     mae[["mg"]] |> as_tibble() |>  # add mg data
