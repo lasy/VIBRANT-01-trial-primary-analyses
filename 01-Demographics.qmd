@@ -25,7 +25,7 @@ The demographics table is constructed as follows.
 
 We first create a `table1_data` `data.frame` from the `participant_crfs_merged` table stored in the `@metadata` slot of the `mae` object. 
 
-This table contains most of the variables required for the demographics summary, including: site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month` and `contraception_method`. 
+This table contains most of the variables required for the demographics summary, including: `site`, `age`, `race`, `ethn`, `cut_size_meals`, `eat_less`, `hungry_did_not_eat`, `sexual_partners_lifetime`, `sexual_partners_past_month` and `contraception_method`. 
 
 Additional variables such as arm and study population flags are retrieved from `mae@colData`. For this analysis, we restrict the dataset to participants in the mITT population.
 
@@ -70,7 +70,7 @@ table1_data |>
 
 In addition to these variables, we also include information about about the gender of participants' sexual partners.
 
-PParticipants were asked about their partner's gender at each weekly visit (weeks 0 through 12: visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, and 2120) using Case Report Form (CRF) 19. Responses are recorded in the `past_week_sex_partner` column of the `mae@metadata$visits_crfs_merged` table. 
+Participants were asked about their partner's gender at each weekly visit (weeks 0 through 12: visits 1000, 1100, 1200, 1300, 1400, 1500, 1700, 1900, and 2120) using Case Report Form (CRF) 19. Responses are recorded in the `past_week_sex_partner` column of the `mae@metadata$visits_crfs_merged` table. 
 
 Based on participants' answers across all weekly visits, we categorized their reported partner gender into one of four groups:
 

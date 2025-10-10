@@ -335,12 +335,15 @@ study_prod_time <-
 # create category 
 study_prod_time <- 
   study_prod_time |> 
-  mutate(last_dose = case_when(
-    study_day_product == study_day_v2 ~ "same day", 
-    study_day_product == study_day_v2-1 ~ "day before", 
-    study_day_product < study_day_v2-1~ "more than one day"
-  ), 
-  last_dose = factor(last_dose, levels = c("same day", "day before", "more than one day")))
+  mutate(
+    last_dose = 
+      case_when(
+        study_day_product == study_day_v2 ~ "same day", 
+        study_day_product == study_day_v2-1 ~ "day before", 
+        study_day_product < study_day_v2-1~ "more than one day"
+      ), 
+    last_dose = factor(last_dose, levels = c("same day", "day before", "more than one day"))
+  )
 
 
 ```
@@ -413,12 +416,17 @@ col_at |>
     .groups = "drop"
   ) |> 
   dplyr::count(prop_tot_LBP >= 0.5) |> 
-  mutate(prop = round(n / sum(n), 3)) |> 
-  gt() 
+  mutate(prop = 100 * round(n / sum(n), 3)) |> 
+  gt() |> 
+  cols_label(
+    `prop_tot_LBP >= 0.5` = "LBP strains ≥ 50% total rel. ab",
+    prop = "%"
+  )
 
   
 
 ```
+
 
 
 ### LBP colonization in participants with BV post-MTZ

@@ -93,7 +93,7 @@ g_tot_prop_LBP_strains <-
 ```{r}
 #| fig-width: 10
 
-g_tot_prop_LBP_strains
+# g_tot_prop_LBP_strains
 
 ```
 
@@ -328,7 +328,7 @@ g_tot_prop_Lc <-
 ```{r}
 #| fig-width: 10
 
-g_tot_prop_Lc
+# g_tot_prop_Lc
 
 ```
 
@@ -818,7 +818,7 @@ g_trajectories <-
 ```{r display-trajectories-plot}
 #| fig-height: 7.5
 #| fig-width: 12
-#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows. The alpha level (transparency) indicates whether the participant is part of the per-protocol (PP) or modified intention-to-treat (mITT) population."
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows. Stars at the bottom of trajectories indicates participant that were not part of the per-protocol (PP) population."
 #| eval: true
 
 g_trajectories 
@@ -939,6 +939,9 @@ Relative abundances of individual LBP strains estimated by metagenomic sequencin
 
 LBP_strains |> 
   filter(!is.na(arm), !is.na(study_week), study_week >= 2) |> 
+  mutate(
+   strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains")
+  ) |> 
   ggplot() +
   aes(x = study_week, y = rel_ab, col = strain_origin) +
   geom_point(alpha = 0.5, size = 0.5) +
@@ -955,7 +958,8 @@ LBP_strains |>
   scale_color_manual("Strain origin", values = strain_origin_colors) +
   scale_x_continuous("Study weeks", breaks = c(0:5,7,9,12), minor_breaks = 0:12) +
   theme(
-    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom"
   ) 
 
 ```
@@ -1053,6 +1057,7 @@ g_colonized_among_exposed
 
 tmp |> 
   mutate(
+    strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains"),
     CI = str_c(
       "[", 
       scales::percent(CI_low, accuracy = 1), 
@@ -1183,6 +1188,7 @@ g_colonized_among_exposed_supp
 
 tmp |> 
   mutate(
+    strain_origin = recode(strain_origin, "SA" = "ZA strains", "US" = "US strains"),
     CI = str_c(
       "[", 
       scales::percent(CI_low, accuracy = 1), 

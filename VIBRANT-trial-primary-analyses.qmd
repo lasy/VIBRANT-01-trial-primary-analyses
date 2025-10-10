@@ -82,7 +82,7 @@ mae
 #| eval: true
 ```
 
-## Primary outcomes (Table 2)
+## Primary outcomes (Table 2) & sensitivity analyses
 
 ```{r 02-primary, child = '02-primary-outcome.qmd'}
 #| eval: true
@@ -102,14 +102,14 @@ mae
 #| eval: true
 ```
 
-## Daily qPCR
+## Supplementary analyses: assessing exposure with daily qPCR
 
 ```{r 05-qPCR, child = '05-daily-qPCR.qmd'}
 #| eval: true
 ```
 
 
-## Figures
+## Figures (export)
 
 ```{r}
 
