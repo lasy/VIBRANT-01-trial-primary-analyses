@@ -11,7 +11,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: true # true refresh false
+  cache: refresh # true refresh false
   warning: false
 knitr:
   opts_chunk:

@@ -1,0 +1,194 @@
+---
+title: "VIBRANT Trial - Primary Analyses"
+author: Laura Symul (UCLouvain), Laura Vermeren (UCLouvain), Susan Holmes (Stanford University)
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+format: 
+   html:
+     page-layout: full
+     code-fold: true
+     toc: true
+     toc-location: left
+     toc-depth: 5
+     embed-resources: true
+execute:
+  cache: true # true refresh false
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "100%"
+editor: source
+---
+
+```{r libraries}
+#| warning: false
+#| cache: false
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(patchwork)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+library(brms)
+library(gtsummary)
+library(labelled)
+library(scales)
+# library(gridExtra)
+library(ggpubr)
+library(ggh4x)
+# library(mia) # BiocManager::install("mia")
+
+#theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+rm(tmp)
+
+```
+
+```{r source-utils}
+#| warning: false
+#| cache: false
+tmp <- fs::dir_map("../VIBRANT-99-utils/R/", source)
+rm(tmp)
+```
+
+
+This document details the analyses and provides results for the primary analyses of the VIBRANT trial. 
+
+## Trial data
+
+The data used for these analyses are stored in an `R Bioconductor MultiAssayExperiment` object which contains the QCed and pre-processed data. The code and description of how raw data have been processed and QCed is available on the [`VIBRANT-0-QC-and-preprocessing` GitHub repository](https://github.com/lasy/VIBRANT-0-QC-and-preprocessing) (Still private at the moment, but will be made public upon publication, and anyone wishing to have access can email [Laura Symul](mailto:laura.symul@uclouvain.be)). 
+
+
+```{r loading-mae}
+# Loading MAE_1
+mae_file <- 
+  fs::dir_ls(str_c(data_dir(), "05 subsetted MAEs/"), regexp = "mae_1_.*\\.rds$") |> 
+  sort(decreasing = TRUE) |>
+  magrittr::extract(1)
+
+cat(str_c("Loading the RDS file containing the unblinded VIBRANT MAE: /", mae_file |> str_remove(data_dir()), "\n"))
+
+mae <- readRDS(mae_file)
+
+rm(mae_file)
+
+mae
+```
+
+
+## Demographics (Table 1 & suppl. tables by sites)
+
+```{r 01-dem, child = '01-Demographics.qmd'}
+#| eval: true
+```
+
+## Primary outcomes (Table 2) & sensitivity analyses
+
+```{r 02-primary, child = '02-primary-outcome.qmd'}
+#| eval: true
+```
+
+
+## Secondary outcomes (Figures 2-4)
+
+```{r 03-secondary, child = '03-secondary-outcomes.qmd'}
+#| eval: true
+```
+
+
+## Supplementary analyses
+
+```{r 04-supplementary, child = '04-supplementary-analyses.qmd'}
+#| eval: true
+```
+
+## Supplementary analyses: assessing exposure with daily qPCR
+
+```{r 05-qPCR, child = '05-daily-qPCR.qmd'}
+#| eval: true
+```
+
+
+## Figures (export)
+
+```{r}
+
+ggsave(
+  g_trajectories, filename = "figures/Figure2_trajectories_plot.pdf",
+  width = 12, height = 7.5, dpi = 300, units = "in"
+)
+
+```
+
+
+```{r}
+#| eval: false
+#| fig-height: 4
+#| fig-width: 12
+
+# figure 3
+
+figure3 <- 
+  g_prop_colonized_by_final + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  g_long_terme_col + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  plot_layout(ncol = 2, widths = c(2, 1.4)) +
+  plot_annotation(tag_level = "A") + 
+  theme(
+    plot.tag = element_text(
+      face = "bold",
+      hjust = -0.5,  
+      vjust = 2     
+    ))
+
+figure3
+
+ggsave(
+  figure3, filename = "figures/Figure3_colonization.pdf",
+  width = 12, height = 5, dpi = 300, units = "in"
+)
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 10
+
+# figure 4 
+ggsave(
+  g_relative_abundance, filename = "figures/Figure4_relative_abundance.pdf",
+  width = 9, height = 6, dpi = 300, units = "in"
+)
+
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 12
+
+# figure 5 
+ggsave(
+  g_colonized_among_exposed, filename = "figures/Figure5_colonized_among_exposed.pdf",
+  width = 9, height = 6, dpi = 300, units = "in"
+)
+
+
+
+```
+
+```{r}
+#| fig-height: 4
+#| fig-width: 12
+
+# Supp figure 4 
+ggsave(
+  g_colonized_among_exposed_supp, filename = "figures/Suppl_Figure4_colonized_among_exposed.pdf",
+  width = 9, height = 6, dpi = 300, units = "in"
+)
+
+
+```
+
+

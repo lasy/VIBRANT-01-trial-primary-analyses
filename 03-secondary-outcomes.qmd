@@ -255,6 +255,56 @@ g_prop_colonized_by +  ggtitle(fig_title)
 
 ```
 
+```{r}
+
+total_rel_ab_of_LBP |> 
+  filter(!is.na(study_week), study_week >= 0) |> 
+  mutate(
+    arm_group = case_when(
+      arm == "Pl" ~ "Placebo",
+      TRUE ~ "Active arms"
+    ) |> factor(levels = c("Placebo", "Active arms"))
+  ) |> 
+  group_by(
+    arm_group, visit_code, study_week
+  ) |> 
+  summarize(
+    n = n(), 
+    n_colonized = sum(total_LBP_rel_ab >= 0.05),
+    prop_colonized = n_colonized/n,
+    CI_low = 
+      prop.test(
+        x = n_colonized, n = n, 
+        conf.level = 0.95)$conf.int[1],
+    CI_high = 
+      prop.test(
+        x = n_colonized, n = n, 
+        conf.level = 0.95)$conf.int[2],
+    .groups = "drop"
+  ) |> 
+  mutate(
+    n_N = str_c(n_colonized, " / ", n),
+    perc = str_c(round(prop_colonized * 100, 1), "% (", round(CI_low * 100, 1), " - ", round(CI_high * 100, 1), "%)"),
+  ) |> 
+  select(arm_group, study_week, n_N, perc) |> 
+  pivot_wider(
+    names_from = arm_group,
+    values_from = c(n_N, perc),
+    names_vary = "slowest"
+  ) |> 
+gt() |> 
+  cols_label(
+    study_week = "Study week",
+    n_N_Placebo = "N colonized (Placebo)",
+    `n_N_Active arms` = "N colonized (Active arms)",
+    perc_Placebo = "Proportion colonized (Placebo)",
+    `perc_Active arms` = "Proportion colonized (Active arms)"
+  ) 
+  
+```
+
+
+
 
 
 ### Kinetics of *L. crispatus* colonization
