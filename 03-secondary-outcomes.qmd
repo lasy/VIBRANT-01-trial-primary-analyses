@@ -787,17 +787,19 @@ rel_abs <-
 ```
 
 ```{r}
+
 rel_abs_agg <- 
   rel_abs |> 
   group_by(uid, taxon, LBP, strain_origin, poor_quality_mg_data) |> 
   summarize(rel_ab = sum(rel_ab), .groups = "drop") |> 
   dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
+
 ```
 
 
 
+```{r}
 
-```{r make-trajectories-plot}
 
 tmp <- 
   rel_abs_agg |> 
@@ -805,9 +807,9 @@ tmp <-
   dplyr::select(pid, pid_label) |> 
   distinct() 
 pid_label <- setNames(tmp$pid_label, tmp$pid)
+rm(tmp)
 
- 
-g_trajectories <-
+trajectories_data <- 
   rel_abs_agg |>
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
   group_by(pid) |> 
@@ -820,8 +822,17 @@ g_trajectories <-
   mutate(
     pid = pid |> fct_inorder(),
     visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
-    ) |> 
-  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + 
+    )
+
+```
+
+
+```{r make-trajectories-plot}
+
+g_trajectories <-
+  trajectories_data |> 
+  ggplot() + 
+  aes(y = rel_ab, x = pid, fill = taxon) +
   geom_col() +
   ggh4x::facet_nested(
     rows = vars(visit_label),
@@ -860,9 +871,6 @@ g_trajectories <-
   )  
 
 
-
-
-
 ```
 
 ```{r display-trajectories-plot}
@@ -874,6 +882,34 @@ g_trajectories <-
 g_trajectories 
 
 ```
+
+```{r}
+#| eval: false
+#| include: false
+
+ordered_participants <- 
+  trajectories_data |> 
+  select(arm, site, pid, mITT, PP) |> 
+  distinct() |> 
+  arrange(arm, site, pid)
+
+export_dir <- str_c(dropbox_dir(), "90_VIBRANT_consolidated_data/91 misc data exports/")
+if (!dir.exists(export_dir)) {
+  dir.create(export_dir, recursive = TRUE)
+}
+
+save(
+  ordered_participants,
+  file = str_c(export_dir, "trajectories_participants.RData")
+  )
+
+write_csv(
+  ordered_participants,
+  file = str_c(export_dir, "trajectories_participants.csv")
+  )
+
+```
+
 
 ```{r}
 #| eval: false
