@@ -138,14 +138,14 @@ plots <-
       data = tibble(study_day = 0, copies_per_swab_med = NA), 
       xmin = 7.5, 
       xmax = case_when(
-        .x == "LC-106-3" ~ 10.5,
-        .x == "LC-106-o" ~ 10.5,
+        .x == "LC106-3" ~ 10.5,
+        .x == "LC106-o" ~ 10.5,
         TRUE ~ 14.5
       ), 
       ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
     ) +
-    # Rectangle jaune supplémentaire pour LC-106-o uniquement
-    {if(.x == "LC-106-o") geom_rect(
+    # Rectangle jaune supplémentaire pour LC106-o uniquement
+    {if(.x == "LC106-o") geom_rect(
       data = tibble(study_day = 0, copies_per_swab_med = NA), 
       xmin = 3.5, xmax = 7.5, ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "gold", col = NA
     )} +
@@ -185,12 +185,12 @@ df_summ <-
   # filter(.feature != "16S") |> 
   group_by(uid, pid, randomized, arm, ITT, mITT, PP, site, visit_code, PIPV, visit, study_day) |> 
   summarise(
-    LC106_total = sum(copies_per_swab_med[str_detect(LBP, "LC-106")], na.rm = TRUE),
-    LC115_excl_total = sum(copies_per_swab_med[!str_detect(LBP, "LC-106")], na.rm = TRUE),
+    LC106_total = sum(copies_per_swab_med[str_detect(LBP, "LC106")], na.rm = TRUE),
+    LC115_excl_total = sum(copies_per_swab_med[!str_detect(LBP, "LC106")], na.rm = TRUE),
     total_LBP = sum(copies_per_swab_med[str_detect(LBP, "LC")], na.rm = TRUE),
     total_16S = sum(copies_per_swab_med[.feature == "16S"], na.rm = TRUE),
-    n_LC106 = sum(str_detect(LBP, "LC-106") & (copies_per_swab_med != 0), na.rm = TRUE),
-    n_LC115_excl = sum(!str_detect(LBP, "LC-106") & (copies_per_swab_med != 0), na.rm = TRUE),
+    n_LC106 = sum(str_detect(LBP, "LC106") & (copies_per_swab_med != 0), na.rm = TRUE),
+    n_LC115_excl = sum(!str_detect(LBP, "LC106") & (copies_per_swab_med != 0), na.rm = TRUE),
     n_LBP = sum(str_detect(LBP, "LC") & (copies_per_swab_med != 0), na.rm = TRUE),
     .groups = "drop"
   ) |> 
@@ -198,15 +198,15 @@ df_summ <-
     n_expected = 
       case_when(
         arm == "Pl" ~ 0,
-        str_detect(arm, "LC-106") ~ 6,
-        str_detect(arm, "LC-115") ~ 15,
+        str_detect(arm, "LC106") ~ 6,
+        str_detect(arm, "LC115") ~ 15,
         TRUE ~ NA_real_
       ),
     n_detected_among_expected = 
       case_when(
         arm == "Pl" ~ n_LBP,
-        str_detect(arm, "LC-106") ~ n_LC106,
-        str_detect(arm, "LC-115") ~ n_LBP,
+        str_detect(arm, "LC106") ~ n_LC106,
+        str_detect(arm, "LC115") ~ n_LBP,
         TRUE ~ NA_real_
       ),
     p_detected = n_detected_among_expected/n_expected
@@ -646,14 +646,14 @@ df_summ_pid <-
   mutate(
     dosing_days = 
       case_when(
-        arm %in% c("Pl","LC-106-7", "LC-115") ~ visit_code %in% c(1102:1201), # "LC-106-3", 
-        arm == "LC-106-3" ~ visit_code %in% c(1102:1104), 
-        arm == "LC-106-o" ~ visit_code %in% c(1004:1103) 
+        arm %in% c("Pl","LC106-7", "LC115") ~ visit_code %in% c(1102:1201), # "LC106-3", 
+        arm == "LC106-3" ~ visit_code %in% c(1102:1104), 
+        arm == "LC106-o" ~ visit_code %in% c(1004:1103) 
       ),
     exposed_tmp = 
       case_when(
-        arm %in% c("Pl","LC-106-7", "LC-106-3", "LC-115") ~ exposed & dosing_days,
-        arm == "LC-106-o" ~ exposed & dosing_days
+        arm %in% c("Pl","LC106-7", "LC106-3", "LC115") ~ exposed & dosing_days,
+        arm == "LC106-o" ~ exposed & dosing_days
       )
   ) |> 
   group_by(arm, site, pid, ITT, mITT, PP) |> 
@@ -694,8 +694,8 @@ df_summ_pid |>
 bind_rows(
   df_summ_pid |> filter(arm != "Pl"),
   df_summ_pid |> filter(arm != "Pl") |> mutate(site = "both"),
-  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(arm = "all active arms excl. LC-106-3"),
-  df_summ_pid |> filter(arm != "Pl", arm != "LC-106-3") |> mutate(site = "both", arm = "all active arms excl. LC-106-3")
+  df_summ_pid |> filter(arm != "Pl", arm != "LC106-3") |> mutate(arm = "all active arms excl. LC106-3"),
+  df_summ_pid |> filter(arm != "Pl", arm != "LC106-3") |> mutate(site = "both", arm = "all active arms excl. LC106-3")
 ) |> 
   filter(mITT) |> 
   group_by(arm, site) |> 
@@ -931,7 +931,7 @@ g_trajectories_qpcr_exp <-
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
   group_by(pid) |> 
   mutate(
-    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LC115 = sum(rel_ab[LBP == "LC115"]),
     tot_LBP = sum(rel_ab[!is.na(LBP)])
     ) |> 
   ungroup() |> 
@@ -1028,7 +1028,7 @@ g_trajectories_appl_exp <-
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
   group_by(pid) |> 
   mutate(
-    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LC115 = sum(rel_ab[LBP == "LC115"]),
     tot_LBP = sum(rel_ab[!is.na(LBP)])
     ) |> 
   ungroup() |> 

@@ -19,7 +19,6 @@ editor: source
 ---
 
 
-
 ```{r}
 fig_title <- mae_title(mae)
 ```
@@ -137,10 +136,10 @@ get_longitudinal_proportions_of_participants_who_colonized <-
   }
 
 arm_colors <- c(
-  "LC-106-7" = "darkorange", 
-  "LC-115"   = "#8E2708",
-  "LC-106-3" = "dodgerblue1",
-  "LC-106-o" = "deeppink",
+  "LC106-7" = "darkorange", 
+  "LC115"   = "#8E2708",
+  "LC106-3" = "dodgerblue1",
+  "LC106-o" = "deeppink",
   "Pl"       = "#B3B3B3"
 )
 
@@ -193,7 +192,7 @@ For the sake of clarity, we remove the two arms that only one participant in the
 
 g_prop_colonized_by_final <- 
   plot_longitudinal_proportions_of_participants_who_colonized(
-    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC106-3", "LC106-o")) & (site == "MGH")))
     )
 g_prop_colonized_by_final + ggtitle(fig_title) 
 
@@ -248,7 +247,7 @@ g_prop_colonized_by +  ggtitle(fig_title)
 
 g_prop_colonized_by <- 
   plot_longitudinal_proportions_of_participants_who_colonized_v2(
-    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    total_rel_ab_of_LBP |> filter(!((arm %in% c("LC106-3", "LC106-o")) & (site == "MGH")))
     )
 
 g_prop_colonized_by +  ggtitle(fig_title) 
@@ -469,7 +468,7 @@ g_prop_colonized_by # + ggtitle(fig_title)
 
 g_prop_colonized_by <- 
   plot_longitudinal_proportions_of_participants_who_colonized(
-    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC106-3", "LC106-o")) & (site == "MGH")))
     )
 
 g_prop_colonized_by + ggtitle(fig_title)
@@ -524,7 +523,7 @@ g_prop_colonized_by + ggtitle(fig_title)
 
 g_prop_colonized_by <- 
   plot_longitudinal_proportions_of_participants_who_colonized_v2(
-    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC-106-3", "LC-106-o")) & (site == "MGH")))
+    total_rel_ab_of_Lc |> filter(!((arm %in% c("LC106-3", "LC106-o")) & (site == "MGH")))
     )
 
 g_prop_colonized_by + ggtitle(fig_title)
@@ -695,15 +694,15 @@ table_still_col |>
   ) |> 
   cols_align(
     align = "center", 
-    columns = c(Pl, `LC-106-7`, `LC-106-3`, `LC-106-o`, `LC-115`, `All arms`, `All active arms`)
+    columns = c(Pl, `LC106-7`, `LC106-3`, `LC106-o`, `LC115`, `All arms`, `All active arms`)
   ) |> 
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     `All active arms` = "All active<br>arms",
     .fn = md
   )
@@ -814,7 +813,7 @@ trajectories_data <-
   filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
   group_by(pid) |> 
   mutate(
-    tot_LC115 = sum(rel_ab[LBP == "LC-115"]),
+    tot_LC115 = sum(rel_ab[LBP == "LC115"]),
     tot_LBP = sum(rel_ab[!is.na(LBP)])
     ) |> 
   ungroup() |> 
@@ -867,6 +866,7 @@ g_trajectories <-
     strip.text.x = element_text(hjust = 0.5),
     axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 15, margin = margin(t = -1)), 
     axis.ticks.x = element_blank(),
+    legend.text = element_markdown(),
     legend.key.height = unit(15, "pt")
   )  
 
@@ -1051,13 +1051,14 @@ LBP_strains |>
 ```
 
 
+
 ### Proportion colonized among exposed
 
 We estimated the proportion of exposed participants who ever colonized with each LBP strain during follow-up (visits after the first 2 weeks), based on metagenomic relative abundances. 
 
 Colonization was defined at the participant level as detection of a given strain at ≥5% relative abundance in at least one post-week 2 sample. Placebo participants were excluded, since they were not exposed to any of the strains. 
 
-For LC-115 strains, only participants in the LC-115 arm were considered exposed, while for LC-106 strains all participants in active arms were considered exposed. For each strain and site, we calculated the number of exposed participants, the number who colonized, the corresponding proportion, and 95% confidence intervals using Wilson’s method.
+For LC115 strains, only participants in the LC115 arm were considered exposed, while for LC106 strains all participants in active arms were considered exposed. For each strain and site, we calculated the number of exposed participants, the number who colonized, the corresponding proportion, and 95% confidence intervals using Wilson’s method.
 
 ```{r}
 
@@ -1084,12 +1085,12 @@ tmp <-
   # exclude Placebo participants because, they were, in theory, not exposed to any of the strains.
   filter(arm != "Pl") |> 
   # define the total number of participants exposed for each strain.
-  # For LC-115 strains, this is only participants of arm LC-115
-  # For LC-106 strains, this is participants from all active arms.
+  # For LC115 strains, this is only participants of arm LC115
+  # For LC106 strains, this is participants from all active arms.
   mutate(
     exposed = case_when(
-      LBP == "LC-115" ~ (arm == "LC-115"),
-      LBP == "LC-106 & LC-115" ~ TRUE,
+      LBP == "LC115" ~ (arm == "LC115"),
+      LBP == "LC106 & LC115" ~ TRUE,
       TRUE ~ FALSE
     )
   ) |> 
@@ -1138,7 +1139,6 @@ g_colonized_among_exposed
 ```
 
 
-
 ```{r}
 
 tmp |> 
@@ -1180,9 +1180,11 @@ tmp |>
 ```
 
 
+
+
 #### Excluding immediate post-product visit
 
-Same analyze as above but excluding the week 2 visit for the LC-106-7 and LC-115 arms, since this visit is immediately after product use.
+Same analyze as above but excluding the week 2 visit for the LC106-7 and LC115 arms, since this visit is immediately after product use.
 
 ```{r}
 
@@ -1203,8 +1205,8 @@ tmp <-
   mutate(
     include_visit = 
       case_when(
-        (arm %in% c("LC-106-7", "LC-115")) & as.numeric(visit_code) > 1200 ~ TRUE,
-        (arm %in% c("LC-106-3", "LC-106-o")) & as.numeric(visit_code) >= 1200 ~TRUE,
+        (arm %in% c("LC106-7", "LC115")) & as.numeric(visit_code) > 1200 ~ TRUE,
+        (arm %in% c("LC106-3", "LC106-o")) & as.numeric(visit_code) >= 1200 ~TRUE,
         TRUE ~ FALSE
       )
   ) |> 
@@ -1218,12 +1220,12 @@ tmp <-
   # exclude Placebo participants because, they were, in theory, not exposed to any of the strains.
   filter(arm != "Pl") |> 
   # define the total number of participants exposed for each strain.
-  # For LC-115 strains, this is only participants of arm LC-115
-  # For LC-106 strains, this is participants from all active arms.
+  # For LC115 strains, this is only participants of arm LC115
+  # For LC106 strains, this is participants from all active arms.
   mutate(
     exposed = case_when(
-      LBP == "LC-115" ~ (arm == "LC-115"),
-      LBP == "LC-106 & LC-115" ~ TRUE,
+      LBP == "LC115" ~ (arm == "LC115"),
+      LBP == "LC106 & LC115" ~ TRUE,
       TRUE ~ FALSE
     )
   ) |> 
@@ -1300,7 +1302,7 @@ tmp |>
   gt(
     row_group_as_column = TRUE, 
     process_md = TRUE,
-    caption = "Proportion of mITT participants exposed to a given strain who colonized with that strain (colonization defined as a ≥ 5% relative abundance by metagenomics) at any weekly visit after product exposure but excluding immediate post-product visit (i.e., excluding week 2 visit for the LC-106-7 and LC-115 arms)."
+    caption = "Proportion of mITT participants exposed to a given strain who colonized with that strain (colonization defined as a ≥ 5% relative abundance by metagenomics) at any weekly visit after product exposure but excluding immediate post-product visit (i.e., excluding week 2 visit for the LC106-7 and LC115 arms)."
   ) |> 
   cols_label(.feature = "LBP strain") |> 
   cols_align(columns = .feature, align = "left") |> 
@@ -1309,6 +1311,5 @@ tmp |>
 
 
 ```
-
 
 

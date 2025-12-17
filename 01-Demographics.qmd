@@ -265,7 +265,7 @@ Study population characteristics appear balanced across arms at the CAPRISA site
 ```{r}
 
 table1_data |> 
-  filter(site == "MGH", !(arm %in% c("LC-106-o", "LC-106-3"))) |> 
+  filter(site == "MGH", !(arm %in% c("LC106-o", "LC106-3"))) |> 
   mutate(arm = arm |> fct_drop()) |> 
   select(-c(pid, site)) |>
   rename_with(~ str_to_title(.x)) |>  

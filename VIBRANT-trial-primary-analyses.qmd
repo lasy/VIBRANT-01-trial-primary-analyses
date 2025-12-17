@@ -11,7 +11,7 @@ format:
      toc-depth: 5
      embed-resources: true
 execute:
-  cache: true # true refresh false
+  cache: false # true refresh false
   warning: false
 knitr:
   opts_chunk:
@@ -36,6 +36,7 @@ library(scales)
 # library(gridExtra)
 library(ggpubr)
 library(ggh4x)
+library(ggtext)
 # library(mia) # BiocManager::install("mia")
 
 #theme_set(theme_light())
@@ -112,6 +113,7 @@ mae
 ## Figures (export)
 
 ```{r}
+#| eval: false
 
 ggsave(
   g_trajectories, filename = "figures/Figure2_trajectories_plot.pdf",
@@ -153,6 +155,8 @@ ggsave(
 ```{r}
 #| fig-height: 4
 #| fig-width: 10
+#| eval: false
+
 
 # figure 4 
 ggsave(
@@ -167,6 +171,8 @@ ggsave(
 ```{r}
 #| fig-height: 4
 #| fig-width: 12
+#| eval: false
+
 
 # figure 5 
 ggsave(
@@ -181,6 +187,7 @@ ggsave(
 ```{r}
 #| fig-height: 4
 #| fig-width: 12
+#| eval: false
 
 # Supp figure 4 
 ggsave(

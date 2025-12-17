@@ -109,10 +109,10 @@ table_2 |>
     name = "",
     # Blinded = "All blinded arms",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   
@@ -253,10 +253,10 @@ table_2_with_model_results |>
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   
@@ -273,7 +273,7 @@ table_2_with_model_results |>
 
 **Defining the alternative primary outcome**
 
-We defined an alternative primary outcome that excluded visits conducted immediately after the last product administration. Specifically, for participants in the 7-dose arms (LC-107-7 and LC-115) and placebo, we eclude visit 1200, while for participants in the 3-dose arm (LC-106-3) and overlap arm (LC-106-o) only visits prior to 1200 (1000 and 1100) were excluded. 
+We defined an alternative primary outcome that excluded visits conducted immediately after the last product administration. Specifically, for participants in the 7-dose arms (LC107-7 and LC115) and placebo, we eclude visit 1200, while for participants in the 3-dose arm (LC106-3) and overlap arm (LC106-o) only visits prior to 1200 (1000 and 1100) were excluded. 
 
 ```{r}
 
@@ -314,8 +314,8 @@ new_outcome_def <-
   mutate(
     tmp = 
       case_when(
-        (arm %in% c("Pl", "LC-106-7", "LC-115")) & (as.numeric(visit_code) <= 1200) ~ FALSE,
-        (arm %in% c("LC-106-3", "LC-106-o")) & (as.numeric(visit_code) < 1200) ~ FALSE,
+        (arm %in% c("Pl", "LC106-7", "LC115")) & (as.numeric(visit_code) <= 1200) ~ FALSE,
+        (arm %in% c("LC106-3", "LC106-o")) & (as.numeric(visit_code) < 1200) ~ FALSE,
         TRUE ~ outcome
       ),
     colonized_LBP_by_mg = cummax(tmp) |> as.logical()
@@ -573,10 +573,10 @@ table_2_with_model_results |>
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   
@@ -788,10 +788,10 @@ table_2_with_model_results |>
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   
@@ -1001,10 +1001,10 @@ table_2_with_model_results |>
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   
@@ -1220,10 +1220,10 @@ table_2_with_model_results |>
   cols_label(
     name = "",
     Pl = "Placebo",
-    `LC-106-7` = "LC-106<br>7 days",
-    `LC-106-3` = "LC-106<br>3 days",
-    `LC-106-o` = "LC-106<br>overlap",
-    `LC-115` = "LC-115<br>7 days",
+    `LC106-7` = "LC106<br>7 days",
+    `LC106-3` = "LC106<br>3 days",
+    `LC106-o` = "LC106<br>overlap",
+    `LC115` = "LC115<br>7 days",
     .fn = md
   )
   

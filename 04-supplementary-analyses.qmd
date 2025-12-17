@@ -272,7 +272,7 @@ applicator |>
 
 
 
-### Interval between last dose and week 2 clinic visit in active arms (LC-106-7, LC-115)
+### Interval between last dose and week 2 clinic visit in active arms (LC106-7, LC115)
 
 We document the time between the last dose taken prior to the in-person visit at week 2 and the swab collected at that visit. This is relevant because the primary outcome is detection of the LBP strain at the week 2 visit, and the time since last dose may influence the likelihood of detection.
 
@@ -379,7 +379,7 @@ study_prod_time |>
 
 ### Dominance of LBP strains at visits remote from dosing 
 
-To assess whether colonization typically reflected dominance, we examined the composition of samples from participants in active arms who achieved the primary outcome at visits conducted after product use (weeks 3–5 for LC-106-7 and LC-115; weeks 2–5 for LC-106-o and LC-106-3). 
+To assess whether colonization typically reflected dominance, we examined the composition of samples from participants in active arms who achieved the primary outcome at visits conducted after product use (weeks 3–5 for LC106-7 and LC115; weeks 2–5 for LC106-o and LC106-3). 
 
 For each colonized sample, we calculated the total relative abundance of LBP strains based on metagenomic data. We then determined the proportion of samples in which LBP strains accounted for at least 50% of the community.
 
@@ -401,8 +401,8 @@ col_at <-
   ) |>
   dplyr::filter(
     .feature == "colonized_LBP_at_mg" &
-      (arm %in% c("LC-106-7", "LC-115") & visit_code %in% c("1300", "1400", "1500") |
-       arm %in% c("LC-106-o", "LC-106-3") & visit_code %in% c("1200", "1300", "1400", "1500")
+      (arm %in% c("LC106-7", "LC115") & visit_code %in% c("1300", "1400", "1500") |
+       arm %in% c("LC106-o", "LC106-3") & visit_code %in% c("1200", "1300", "1400", "1500")
       )
   ) |>
   filter(outcome) # only primary outcome achieved 
