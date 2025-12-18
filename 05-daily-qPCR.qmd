@@ -72,6 +72,7 @@ df |>
 
 
 ```
+
 ##### LBP strains
 
 We generate heatmaps of qPCR results for each study arm. For every participant and visit, the median number of copies per swab for each LBP strain is shown, with strain identity on the y-axis and visit code on the x-axis.
@@ -788,6 +789,7 @@ exposed_qpcr <-
   )
 
 exposed_qpcr
+supplementary_figure3 <- exposed_qpcr
 
 ```
 
@@ -978,7 +980,8 @@ g_trajectories_qpcr_exp <-
     strip.text.x = element_text(hjust = 0.5),
     axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
     axis.ticks.x = element_blank(),
-    legend.key.height = unit(15, "pt")
+    legend.key.height = unit(15, "pt"),
+    legend.text = element_markdown()
   )  
 
 
@@ -1075,7 +1078,8 @@ g_trajectories_appl_exp <-
     strip.text.x = element_text(hjust = 0.5),
     axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
     axis.ticks.x = element_blank(),
-    legend.key.height = unit(15, "pt")
+    legend.key.height = unit(15, "pt"), 
+    legend.text = element_markdown()
   )  
 
 

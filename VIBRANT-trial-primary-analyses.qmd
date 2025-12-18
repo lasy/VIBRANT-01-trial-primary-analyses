@@ -187,7 +187,7 @@ ggsave(
 ```{r}
 #| fig-height: 4
 #| fig-width: 12
-#| eval: false
+#| eval: true
 
 # Supp figure 4 
 ggsave(
@@ -198,3 +198,16 @@ ggsave(
 
 ```
 
+
+```{r}
+# supplementary figure 3 
+#| fig-height: 4
+#| fig-width: 12
+#| eval: false
+
+ggsave(
+  supplementary_figure3, filename = "figures/Suppl_Figure3_colonized_among_exposed.pdf",
+  width = 9, height = 6, dpi = 300, units = "in"
+)
+
+```
