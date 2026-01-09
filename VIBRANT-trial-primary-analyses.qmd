@@ -63,7 +63,7 @@ The data used for these analyses are stored in an `R Bioconductor MultiAssayExpe
 ```{r loading-mae}
 # Loading MAE_1
 mae_file <- 
-  fs::dir_ls(str_c(data_dir(), "05 subsetted MAEs/"), regexp = "mae_1_.*\\.rds$") |> 
+  fs::dir_ls(str_c(data_dir(), "06 subsetted MAEs/"), regexp = "mae_1_.*\\.rds$") |> 
   sort(decreasing = TRUE) |>
   magrittr::extract(1)
 
@@ -103,11 +103,6 @@ mae
 #| eval: true
 ```
 
-## Supplementary analyses: assessing exposure with daily qPCR
-
-```{r 05-qPCR, child = '05-daily-qPCR.qmd'}
-#| eval: true
-```
 
 
 ## Figures (export)

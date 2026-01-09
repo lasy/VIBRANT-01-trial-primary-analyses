@@ -44,16 +44,9 @@ study_product <-
   distinct() |> 
   filter(randomized, mITT) |> 
   left_join(
-    metadata(mae)$exposures,  
+    mae@metadata$calc_vars_pid |> select(pid, n_product_doses),  
     by = "pid"
-  ) |>
-  group_by(pid) |>
-  summarize(
-    n_product_doses = sum(study_product |> as.integer(), na.rm = TRUE),
-    n_product_doses_PP = sum(study_product_PP, na.rm = TRUE),
-    comments_studyproduct = str_c(comments_studyproduct[!is.na(comments_studyproduct)], collapse = "; "),
-    .groups = "drop"
-  ) 
+  )
 
 applicator <- 
   mae@colData |> as_tibble() |>
@@ -272,109 +265,41 @@ applicator |>
 
 
 
-### Interval between last dose and week 2 clinic visit in active arms (LC106-7, LC115)
-
-We document the time between the last dose taken prior to the in-person visit at week 2 and the swab collected at that visit. This is relevant because the primary outcome is detection of the LBP strain at the week 2 visit, and the time since last dose may influence the likelihood of detection.
-
-Information on the self-reported time of last study product use comes from `exposures`, while the study day of the week 2 in-person visit is taken from `visits_crfs_merged.`
-
-We define the following categories for the timing of the last study product use:
--   "same day": last dose taken on the same day as the visit (before 6 p.m.)
--   "day before": last dose taken the day before the visit
--   "more than 1 day": last dose taken more than one day before the visit
-
+### Interval between last dose and week 2 clinic visit in active arms
 
 ```{r}
-#| eval: true
 
-
-study_product <-
-  mae@colData |>
-  as_tibble() |>
-  select(pid, site, randomized, arm, ITT, mITT, PP) |>
-  distinct() |>
-  filter(randomized, mITT) |>
+tmp <- 
+  mae@metadata$calc_vars_pid |>
   left_join(
-    metadata(mae)$exposures |> select(pid, visit_code, study_product),
-  by = "pid"
-  ) |>
-  left_join(
-    metadata(mae)$visits_crfs_merged |> as_tibble() |> select(pid, visit_code, study_day, insert_study_product_time),
-    by = (c("pid", "visit_code"))) |>
-  dplyr::rename(
-    study_day_product = study_day,
-    visit_code_product = visit_code
-  ) 
-
-
-# study_day visit 2 in person
-# ! pid 068100026 appear 2 times ! -> remove using filter(!is.na(study_day_visit2))
-visit2_studyday <- 
-  metadata(mae)$visits_crfs_merged |> 
-  as_tibble() |> 
-  select(pid, visit_code, study_day) |> 
-  distinct() |> 
-  filter(visit_code == "1200") |> 
-  dplyr::rename(
-    study_day_v2 = study_day
+    mae@colData |>
+      as.data.frame() |> 
+      select(pid, site, arm, randomized, mITT) |> 
+      distinct(),
+    by = join_by(pid)
   ) |> 
-  dplyr::filter(!is.na(study_day_v2))
-  
-study_prod_time <- 
-  study_product |> 
-  left_join(visit2_studyday |> select(-visit_code), by = "pid") |> 
-  filter(arm!="Pl") |> 
-  group_by(pid) |> 
-  filter(study_product =="1") |> 
-  filter(study_day_product <= study_day_v2) |>  # only consider doses taken before v2
-  filter(!((study_day_product == study_day_v2) & (insert_study_product_time %in% c("Late evening (9pm-midnight)", "Evening (6pm-9pm)")))) |> 
-  arrange(study_day_product) |> 
-  slice_tail(n = 1) |>              
-  ungroup() 
+  filter(randomized, mITT) 
 
-# create category 
-study_prod_time <- 
-  study_prod_time |> 
-  mutate(
-    last_dose = 
-      case_when(
-        study_day_product == study_day_v2 ~ "same day", 
-        study_day_product == study_day_v2-1 ~ "day before", 
-        study_day_product < study_day_v2-1~ "more than one day"
-      ), 
-    last_dose = factor(last_dose, levels = c("same day", "day before", "more than one day"))
-  )
-
-
-```
-
-Table
-
-```{r}
-
-study_prod_time |> 
-  dplyr::count(last_dose) |> 
-  gt()
-
-```
-
-```{r}
-
-study_prod_time |> 
-  group_by(site, arm, last_dose) |> 
-  summarize(
-    n = n(),  
-    .groups = "drop"
-  ) |> 
-  ungroup() |> 
+tmp |> 
+  filter(arm != "Pl") |> 
+  dplyr::count(site, arm, last_dose_at_W2) |> 
   pivot_wider(
-    id_cols = c(site, last_dose), 
+    id_cols = c(site, last_dose_at_W2), 
     names_from = arm,
     values_from = n, values_fill = 0
   ) |> 
   group_by(site) |> 
+  gt() 
+
+tmp |> 
+  filter(arm != "Pl") |>
+  dplyr::count(last_dose_at_W2) |>
   gt()
+
+rm(tmp)
+
 ```
+
 
 
 ### Dominance of LBP strains at visits remote from dosing 
@@ -1046,6 +971,435 @@ detected_at_week9_qPCR |>
   mutate(p = n/sum(n) * 100) |> 
   gt(caption = "With placebo")
 ```
+
+
+
+
+### Effective LBP exposure from daily qPCR data during dosing period
+
+Here we look at the proportion of days exposed by qPCR (daily home swabs), among expected dosing days based on participants' arm.
+
+```{r}
+
+eff_exp_qPCR <- 
+  mae@colData |> as_tibble() |> 
+  select(pid, site, randomized, arm, ITT, mITT, PP) |> 
+  distinct() |> 
+  filter(randomized, mITT) |>
+  left_join(
+    mae@metadata$calc_vars_pid |> 
+      select(pid, pid_exposed_by_qPCR, n_days_exposed_by_qPCR, n_days_exp_dosed),
+    by = join_by(pid)
+  ) |>
+  mutate(
+    prop_days_exposed = 
+      case_when(
+        n_days_exp_dosed > 0 ~ n_days_exposed_by_qPCR / n_days_exp_dosed,
+        TRUE ~ 0
+      )
+  )
+
+```
+
+```{r}
+
+eff_exp_qPCR |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    N = n(),
+    n = sum(pid_exposed_by_qPCR, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    value = str_c(n, " / ", N, " (", round(100*n/N, 1), "%)")
+  ) |>  
+  select(-n, -N) |>
+  pivot_wider(names_from = arm, values_from = value) |> 
+  gt(caption = "Participants exposed by qPCR (daily home swabs): n/N (%)") 
+
+```
+
+
+```{r}
+
+bind_rows(
+  eff_exp_qPCR |> filter(arm != "Pl"),
+  eff_exp_qPCR |> filter(arm != "Pl") |> mutate(site = "both"),
+  eff_exp_qPCR |> filter(arm != "Pl", arm != "LC106-3") |> mutate(arm = "all active arms excl. LC106-3"),
+  eff_exp_qPCR |> filter(arm != "Pl", arm != "LC106-3") |> mutate(site = "both", arm = "all active arms excl. LC106-3")
+) |> 
+  filter(mITT) |> 
+  group_by(arm, site) |> 
+  summarize(
+    n = sum(!is.na(prop_days_exposed)),
+    mean_prop_days_exposed = mean(prop_days_exposed, na.rm = TRUE),
+    sd_prop = sd(prop_days_exposed, na.rm = TRUE),
+    se = sd_prop / sqrt(n), 
+    ci_lower = pmax(0, mean_prop_days_exposed - qt(0.975, df = pmax(n - 1, 1)) * se),
+    ci_upper = pmin(1, mean_prop_days_exposed + qt(0.975, df = pmax(n - 1, 1)) * se), 
+    mean_with_ci = str_c(percent(mean_prop_days_exposed, accuracy = 1), " (", percent(ci_lower, accuracy = 1), "–", percent(ci_upper, accuracy = 1), ")"),
+    .groups = "drop"
+  ) |>  
+  select(arm, site, mean_with_ci) |>
+  pivot_wider(names_from = arm, values_from = mean_with_ci) |> 
+  gt(caption = "Proportion of days exposed by qPCR (daily home swabs), among dosing days: mean proportion (in %) and associated 95% CI.") 
+
+
+```
+
+
+
+
+We group participants by the proportion of days exposed by qPCR (daily home swabs), among dosing days: >50%, >0% to ≤50%, and 0%. We then summarize the number and percentage of participants in each group, along with 95% confidence intervals, stratified by study arm.
+
+```{r}
+
+summary_exposed_qpcr <-
+  eff_exp_qPCR |>
+  filter(arm != "Pl") |>
+  filter(mITT) |> 
+  mutate(
+    expo_grp = case_when(
+      prop_days_exposed > 0.5                     ~ ">50%",
+      prop_days_exposed > 0 & prop_days_exposed <= 0.5 ~ ">0%, ≤50%",
+      prop_days_exposed == 0                      ~ "0%",
+      .default = NA_character_
+    ) |> factor(levels = c(">50%", ">0%, ≤50%", "0%"))
+  ) |>
+  dplyr::count(arm, expo_grp, name = "n") |>
+  group_by(arm) |>
+  mutate(tot_participant = sum(n), p = n / tot_participant |> round(2)) |>
+  rowwise() |>
+  mutate(
+    CI = list(binom::binom.confint(n, tot_participant, method = "exact")[, c("lower","upper")])
+  ) |>
+  ungroup() |>
+  unnest_wider(CI, names_sep = "_")
+
+summary_exposed_qpcr |> 
+  group_by(arm) |> 
+  gt(row_group_as_column = TRUE)|>
+  fmt_number(
+    columns = where(is.numeric),
+    decimals = 2
+  )
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 7
+
+# supplementary figure 3
+
+exposed_qpcr <- 
+  summary_exposed_qpcr |> 
+  arrange(arm) |> 
+  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
+  ggplot() +
+  aes(x = arm, y = p, col = expo_grp) +
+  geom_linerange(
+    aes(ymin = CI_lower, ymax = CI_upper), 
+    linewidth = 1.5, alpha = 0.5, lineend = "round",
+    position = position_dodge(width = 0.5)
+    ) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  scale_color_manual("% of dosing days\nwith evidence of\nLBP exposure by qPCR", values = c(
+    ">50%" = "grey50",
+    ">0%, ≤50%" = "steelblue", 
+    "0%" = "gold1"
+  )) +
+  xlab("") + 
+  scale_y_continuous(
+    name = "% of participants",
+    labels = scales::percent_format(accuracy = 1), 
+    breaks = seq(0, 1, by = 0.2)
+  ) +
+  theme(
+    panel.grid.major.x = element_blank()
+    # axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+exposed_qpcr
+supplementary_figure3 <- exposed_qpcr
+
+```
+
+
+```{r}
+#| fig-height: 4
+#| fig-width: 7
+
+# alternative supplementary figure 3
+
+exposed_qpcr <- 
+  eff_exp_qPCR |> 
+  filter(arm != "Pl") |> 
+  arrange(arm) |> 
+  mutate(arm = arm |> str_replace_all(" ", "\n") |> fct_inorder()) |> 
+  ggplot() +
+  aes(x = arm, y = prop_days_exposed) +
+  geom_violin(col = NA, fill = "steelblue1", alpha = 0.5) +
+  ggbeeswarm::geom_quasirandom(alpha = 0.7) +
+  scale_y_continuous(
+    name = "% of dosing days with\nevidence of LBP exposure by qPCR",
+    labels = scales::percent_format(accuracy = 1), 
+    breaks = seq(0, 1, by = 0.2)
+  ) 
+
+exposed_qpcr
+
+```
+
+
+
+##### Microbiota trajectories highlighting people exposed by qPCR
+
+Longitudinal stack relative abundances plot:
+
+```{r}
+
+rel_abs <- 
+  mae[["mg"]] |> 
+  as_tibble() |> 
+  dplyr::select(
+    .feature, .sample, uid, rel_ab, poor_quality_mg_data,
+    taxon_label, genus, LBP, strain_origin
+    ) 
+
+```
+
+```{r}
+
+rel_abs <- 
+  rel_abs |> 
+  group_by(.feature) |> 
+  mutate(max_rel_ab = max(rel_ab, na.rm = TRUE), mean_rel_ab = mean(rel_ab, na.rm = TRUE)) |> 
+  ungroup() |> 
+  arrange(is.na(LBP), -mean_rel_ab) |> 
+  mutate(.feature = .feature |> fct_inorder()) |> 
+  mutate(
+    taxon = 
+      case_when(
+        as.numeric(.feature) <= 29 ~ taxon_label,
+        (genus == "Lactobacillus") ~ "Other Lactobacillus",
+        TRUE ~ "Other non-Lacto."
+      )
+  ) |> 
+  arrange(is.na(LBP), LBP,genus != "Lactobacillus", genus, -mean_rel_ab) |> 
+  mutate(taxon = taxon |> fct_inorder() |> fct_relevel("Other Lactobacillus", "Other non-Lacto.", "Other", after = Inf))
+
+```
+
+```{r}
+
+rel_abs_agg <- 
+  rel_abs |> 
+  group_by(uid, taxon, LBP, strain_origin, poor_quality_mg_data) |> 
+  summarize(rel_ab = sum(rel_ab), .groups = "drop") |> 
+  dplyr::left_join(mae |> colData() |> as_tibble(), by = join_by(uid)) 
+
+
+```
+
+
+
+
+```{r make-trajectories-plot-qPCR-exposure}
+
+tmp <- 
+  eff_exp_qPCR |> 
+  right_join(rel_abs_agg |> select(pid) |> distinct()) |> 
+  mutate(
+    pid_label = 
+      case_when(
+        prop_days_exposed > 0.5 ~ "E",
+        prop_days_exposed > 0 ~ "e",
+        is.na(prop_days_exposed) ~ "?",
+        TRUE ~ "."
+      ) 
+    ) |> 
+  dplyr::select(pid, pid_label) |> 
+  distinct() 
+pid_label <- setNames(tmp$pid_label, tmp$pid)
+
+ 
+g_trajectories_qpcr_exp <-
+  rel_abs_agg |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
+  geom_col() +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(arm, site),
+    scales = "free_x", space = "free_x", 
+    strip = 
+      ggh4x::strip_nested(
+        background_x = 
+          ggh4x::elem_list_rect(
+            fill = c(rep("gray90",5), 
+                     rep(c("#FF0000", "#00868B"), 5))
+          ), 
+        text_x = 
+          ggh4x::elem_list_text(
+            face = rep("bold", 15),
+            colour = c(rep("black", 5), rep("white", 5), "transparent", "white", "transparent", rep("white", 3))
+            )              
+      )
+  ) +
+  scale_fill_manual(
+    "LBP strain or taxon",
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants", labels = pid_label) +
+  theme(
+    #strip.background.y = element_rect(fill = "gray90"),
+    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    strip.text.x = element_text(hjust = 0.5),
+    axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
+    axis.ticks.x = element_blank(),
+    legend.key.height = unit(15, "pt"),
+    legend.text = element_markdown()
+  )  
+
+
+# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+
+
+
+```
+
+```{r display-trajectories-plot-qPCR-exposure}
+#| fig-height: 7.5
+#| fig-width: 12
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows."
+#| eval: true
+
+g_trajectories_qpcr_exp 
+
+```
+
+
+
+
+```{r make-trajectories-plot-applicator-exposure}
+
+tmp <- 
+  applicator |> 
+  select(pid, number_of_returned_applicators, p_pos_applicator = proportion_positive_applicators) |>
+  distinct() |> 
+  right_join(rel_abs_agg |> select(pid) |> distinct()) |> 
+  mutate(
+    pid_label = 
+      case_when(
+        is.na(number_of_returned_applicators) ~ "?",
+        number_of_returned_applicators == 0 ~ "?",
+        p_pos_applicator > 0.75 ~ "A",
+        p_pos_applicator > 0 ~ "a",
+        TRUE ~ "."
+      ) 
+    ) |> 
+  dplyr::select(pid, pid_label) |> 
+  distinct() 
+pid_label <- setNames(tmp$pid_label, tmp$pid)
+
+ 
+g_trajectories_appl_exp <-
+  rel_abs_agg |>
+  filter(mITT, randomized != 0, PIPV, !poor_quality_mg_data) |>
+  group_by(pid) |> 
+  mutate(
+    tot_LC115 = sum(rel_ab[LBP == "LC115"]),
+    tot_LBP = sum(rel_ab[!is.na(LBP)])
+    ) |> 
+  ungroup() |> 
+  arrange(desc(PP), -tot_LC115, -tot_LBP) |> 
+  mutate(
+    pid = pid |> fct_inorder(),
+    visit_label = visit |> as.character() |> fct_reorder(visit |> as.numeric())
+    ) |> 
+  ggplot(aes(y = rel_ab, x = pid, fill = taxon)) + #, alpha = ifelse(PP, "PP", "mITT")
+  geom_col() +
+  ggh4x::facet_nested(
+    rows = vars(visit_label),
+    cols = vars(arm, site),
+    scales = "free_x", space = "free_x", 
+    strip = 
+      ggh4x::strip_nested(
+        background_x = 
+          ggh4x::elem_list_rect(
+            fill = c(rep("gray90",5), 
+                     rep(c("#FF0000", "#00868B"), 5))
+          ), 
+        text_x = 
+          ggh4x::elem_list_text(
+            face = rep("bold", 15),
+            colour = c(rep("black", 5), rep("white", 5), "transparent", "white", "transparent", rep("white", 3))
+            )              
+      )
+  ) +
+  scale_fill_manual(
+    "LBP strain or taxon",
+    values = get_taxa_colors(rel_abs_agg$taxon |> levels()),
+    labels = get_taxa_labels(rel_abs_agg$taxon |> levels()),
+    guide = guide_legend(ncol = 1)
+    ) +
+  #scale_alpha_discrete("Population", range = c(0.5, 1)) +
+  scale_y_continuous(
+    "Relative abundance", labels = scales::percent,
+    breaks = seq(0, 0.5, by = 0.5), minor_breaks = seq(0, 1, by = 0.25)
+  ) +
+  scale_x_discrete("Participants", labels = pid_label) +
+  theme(
+    #strip.background.y = element_rect(fill = "gray90"),
+    #strip.text.y = element_text(color = "black", angle = 0, hjust = 0), # face = "bold", 
+    strip.text.x = element_text(hjust = 0.5),
+    axis.text.x = element_text(hjust = 0.5, vjust = 1, size = 10, margin = margin(t = 0)), 
+    axis.ticks.x = element_blank(),
+    legend.key.height = unit(15, "pt"), 
+    legend.text = element_markdown()
+  )  
+
+
+# theme_bw() + theme(axis.ticks.x = element_blank(), strip.text.y = element_text(angle = 0))
+
+
+
+```
+
+```{r display-trajectories-plot-applicator-exposure}
+#| fig-height: 7.5
+#| fig-width: 12
+#| fig-cap: "Microbiota trajectories of mITT participants in the VIBRANT study. The relative abundances of the LBP strains and top taxa are shown. Participants are ordered by their total relative abundance of LBP strains, and the study weeks are shown in the rows."
+#| eval: true
+
+g_trajectories_appl_exp 
+
+```
+
+
+
+
 
 
 
