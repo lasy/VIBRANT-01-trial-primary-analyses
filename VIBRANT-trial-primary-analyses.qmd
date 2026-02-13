@@ -147,11 +147,50 @@ ggsave(
 ```
 
 
+
+```{r}
+#| eval: false
+#| fig-height: 12
+#| fig-width: 12
+
+# figure 3
+
+figure2b <- 
+  free(g_trajectories) +
+  g_prop_colonized_by_final + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  g_long_terme_col + theme(legend.position = "bottom", legend.direction = "horizontal") +
+  plot_layout(
+    design = "
+    AA
+    BC
+    ",
+    ncol = 2, widths = c(2, 1.4), heights = c(2.65, 1)
+    ) +
+  plot_annotation(tag_level = "A") + 
+  theme(
+    plot.tag = element_text(
+      face = "bold",
+      hjust = -0.5,  
+      vjust = 2     
+    ))
+
+figure2b
+
+ggsave(
+  figure2b, filename = "figures/Figure2b_colonization.pdf",
+  width = 12, height = 12.5, dpi = 300, units = "in"
+)
+
+```
+
+
 ```{r}
 #| fig-height: 4
 #| fig-width: 10
 #| eval: false
 
+
+# PREVIOUS VERSION
 
 # figure 4 
 ggsave(
@@ -168,6 +207,8 @@ ggsave(
 #| fig-width: 12
 #| eval: false
 
+# PREVIOUS VERSION
+
 
 # figure 5 
 ggsave(
@@ -178,6 +219,40 @@ ggsave(
 
 
 ```
+
+
+```{r}
+#| fig-height: 11
+#| fig-width: 12
+#| eval: false
+
+
+figure4 <- 
+  g_relative_abundance + 
+  theme(legend.position = "bottom", legend.direction = "horizontal") +
+  g_colonized_among_exposed + guides(col = "none") +
+  plot_layout(ncol = 1, nrow = 2, heights = c(2, 1.2)) +
+  plot_annotation(tag_level = "A") + 
+  theme(
+    plot.tag = element_text(
+      face = "bold",
+      hjust = -0.5,  
+      vjust = 2     
+    )
+  )
+
+figure4
+
+
+# figure 4
+ggsave(
+  figure4, filename = "figures/Figure4_strains.pdf",
+  width = 9, height = 9, dpi = 300, units = "in"
+)
+
+```
+
+
 
 ```{r}
 #| fig-height: 4
