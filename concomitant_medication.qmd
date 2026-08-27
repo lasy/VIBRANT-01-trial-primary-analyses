@@ -1,0 +1,293 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{r}
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(patchwork)
+library(SummarizedExperiment)
+library(tidySummarizedExperiment)
+library(brms)
+library(gtsummary)
+library(labelled)
+library(scales)
+# library(gridExtra)
+library(ggpubr)
+library(ggh4x)
+library(ggtext)
+# library(mia) # BiocManager::install("mia")
+
+#theme_set(theme_light())
+tmp <- fs::dir_map("R", source)
+rm(tmp)
+```
+
+
+```{r source-utils}
+#| warning: false
+#| cache: false
+tmp <- fs::dir_map("../VIBRANT-99-utils/R/", source)
+rm(tmp)
+```
+
+```{r}
+mae_file <- 
+  fs::dir_ls(str_c(data_dir(), "05 augmented MAEs/"), regexp = "mae_full_.*\\.rds$") |> 
+  sort(decreasing = TRUE) |>
+  magrittr::extract(1)
+
+cat(str_c("Loading the RDS file containing the unblinded VIBRANT MAE: /", mae_file |> str_remove(data_dir()), "\n"))
+
+mae <- readRDS(mae_file)
+
+rm(mae_file)
+
+mae
+```
+
+
+## Concomitant medications
+
+### CRF 31 - Concomitant medications
+
+We analyse the concomitant medications data in the VIBRANT MAE. We are interested in the medication reported in CRF31
+
+```{r}
+
+
+crf31 <- 
+  metadata(mae)$crf_data_clean$crf31 |> 
+  left_join(
+    colData(mae) |> 
+      as_tibble() |> 
+      select(pid, ITT, mITT, PP, randomized) |> 
+      distinct()
+    ) |> 
+  filter(randomized)
+
+crf31 |> 
+  dplyr::count(medication) |> 
+  gt::gt(caption = "Concominant medication")
+
+```
+
+Some of them are antibiotics. 
+
+
+```{r}
+antibiotics <- c("METRONIDAZOLE", "FLAGYL", "NITROFURANTOIN", "MACROBID", "AZITHROMYCIN", "PENICILLIN", "AMOXICILLIN", "AUGMENTIN", "CIPROBAY", "CIPROFLOXACIN", "CEFTRIAXONE", "DOXYCYCLINE","FOSFOMYCIN", "BENZANINE", "URIZONE")
+
+# crf31 |> 
+#   filter(str_detect(medication, paste(antibiotics, collapse = "|"))) |> 
+#   dplyr::count(medication) |> 
+#   gt::gt(caption="Supplementary antibiotics")
+
+
+crf31 |> 
+  filter(str_detect(medication, paste(antibiotics, collapse = "|"))) |>
+  summarise(
+    n = n(),
+    n_PP = sum(PP, na.rm = TRUE),
+    .by = medication
+  ) |>
+  arrange(desc(n)) |> 
+  gt::gt(caption = "Supplementary antibiotics")
+
+```
+
+We look at when these participants took antibiotics. 
+
+Note : stars represent participants not included in the PP population
+
+```{r}
+
+suppl_antibiotics_crf31 <- 
+  crf31 |> 
+  filter(str_detect(medication, paste(antibiotics, collapse = "|"))) |>
+    mutate(
+    antibiotics_cat = case_when(
+      str_detect(medication, regex("METRONIDAZOLE|FLAGYL", ignore_case = TRUE)) ~ "Metronidazole",
+      str_detect(medication, regex("NITROFURANTOIN|MACROBID", ignore_case = TRUE)) ~ "Nitrofurans",
+      str_detect(medication, regex("AZITHRO", ignore_case = TRUE)) ~ "Macrolides",
+      str_detect(medication, regex("PENICILLIN|AMOXICILLIN|AUGMENTIN", ignore_case = TRUE)) ~ "Penicillins",
+      str_detect(medication, regex("CIPROFLOXACIN|CIPROBAY", ignore_case = TRUE)) ~ "Fluoroquinolones",
+      str_detect(medication, regex("CEFTRIAXONE", ignore_case = TRUE)) ~ "Cephalosporins",
+      str_detect(medication, regex("DOXYCYCLINE", ignore_case = TRUE)) ~ "Tetracyclines",
+      str_detect(medication, regex("FOSFOMYCIN", ignore_case = TRUE)) ~ "Fosfomycin",
+      str_detect(medication, regex("BENZANINE", ignore_case = TRUE)) ~ "Benzanines",
+      str_detect(medication, regex("URIZONE", ignore_case = TRUE)) ~ "Urizone",
+      TRUE ~ "Other_or_non_abx"
+    ), 
+    med_stop_relative_date = ifelse(is.na(med_stop_relative_date), med_start_relative_date, med_stop_relative_date), 
+    pid_label = ifelse(!PP, paste("(*) ", pid), pid)
+  ) |> 
+    select(pid, medication, indication, med_start_relative_date, med_stop_relative_date, antibiotics_cat, PP, pid_label)
+
+```
+
+```{r}
+#| fig.height: 8
+#| fig.width: 8
+
+suppl_antibiotics_crf31 |> 
+  ggplot() +
+  aes(
+    x    = med_start_relative_date,
+    xend = med_stop_relative_date,
+    y    = pid_label,
+    color = antibiotics_cat
+  ) +
+    annotate(
+    "rect",
+    xmin = -Inf, xmax = 35,
+    ymin = -Inf, ymax = Inf,
+    fill = "pink", alpha = 0.2
+  ) + 
+  geom_segment(linewidth = 1.2, lineend = "round") +
+  geom_point(
+    data = suppl_antibiotics |> 
+      filter(med_start_relative_date == med_stop_relative_date),
+    aes(x = med_start_relative_date),
+    size = 1
+  ) +
+  labs(
+    x = "Study day",
+    y = "Participant",
+    color = "Antibiotic",
+    title = "Periods of additional antibiotic use"
+  ) +
+  scale_x_continuous(breaks = seq(0,100, by=7))
+
+```
+
+
+We restructure the data to add it to the `mae_filtered`. 
+
+```{r}
+
+tmp <- 
+  suppl_antibiotics_crf31 |> 
+  filter(med_start_relative_date <= 35) |> 
+  select(pid, med_start_relative_date, med_stop_relative_date, antibiotics_cat) |> 
+  rowwise() |> 
+  mutate(study_day = list(med_start_relative_date:min(med_stop_relative_date, 35))) |> 
+  unnest(study_day) |> 
+  select(pid, study_day, supplementary_antibiotics = antibiotics_cat) |> 
+  ungroup() 
+
+tmp <- 
+  tmp |> 
+  group_by(pid, study_day) |>
+  summarise(
+    supplementary_antibiotics = paste(supplementary_antibiotics, collapse = "; "),
+    .groups = "drop"
+  )
+
+```
+
+### CRF 20 - Antibiotics
+
+In the CRF20 it was ask wheter the participants took antibiotics (vaginal or oral) or any probiotics (vaginal or oral) or something for yeast, lubricant, etc. during the past week. This CRF was fill every clinical visit (from V1 to V9). 
+
+```{r}
+
+crf20 <- 
+  metadata(mae)$visits_crfs_merged |> 
+  left_join(
+    colData(mae) |> 
+      as_tibble() |> 
+      select(pid, ITT, mITT, PP, randomized) |> 
+      distinct()
+    ) |> 
+  filter(randomized) |>
+  select(pid, visit_code, study_day, PP,  used_during_past_week) 
+
+crf20 |> 
+  dplyr::count(used_during_past_week) |> 
+  gt::gt(caption = "Antibiotics/probiotics use during the past week, by visit")
+
+```
+
+We only look at the vaginal/oral antibiotics or yeast medication use during the past week.
+
+```{r}
+
+suppl_antibiotics_crf20 <- 
+  crf20 |>
+  filter(str_detect(used_during_past_week, "oral_antibiotic|vaginal_antibiotic|oral_yeast|vaginal_yeast")) |> 
+  mutate(
+    used_during_past_week = str_remove(used_during_past_week, "lube_with_sex, ")
+  )
+ 
+suppl_antibiotics_crf20 |> 
+  dplyr::count(used_during_past_week)
+
+suppl_antibiotics_crf20 |> 
+  ggplot() +
+  aes(x = study_day, y = pid, color = used_during_past_week) +
+  geom_point() +
+annotate(
+    "rect",
+    xmin = -Inf, xmax = 35,
+    ymin = -Inf, ymax = Inf,
+    fill = "pink", alpha = 0.2
+  ) +
+  labs(
+    x = "Study day",
+    y = "Participant",
+    color = "Medication use during the past week",
+    title = "Medication use during the past week (CRF20)"
+  ) +
+  scale_x_continuous(breaks = seq(0,100, by=7))
+
+```
+
+We want to see if some supplementary antibiotics were not reported in CRF31 but were reported in CRF20. We look at a window of 7 days before the study day of the visit where CRF20 was filled.
+
+```{r}
+
+suppl_antibiotics_crf20 <- 
+  suppl_antibiotics_crf20 |> 
+  mutate(
+    window_start = study_day - 7,
+    window_end   = study_day, 
+    pid_label = ifelse(!PP, paste("(*) ", pid), pid)
+  )
+
+suppl_antibiotics_crf20_crf31 <-
+  suppl_antibiotics_crf20 |> 
+  select(pid, crf20_weekly_visit = visit_code, crf20_start = window_start, crf20_end = window_end, antibiotics_crf20 = used_during_past_week, PP, pid_label) |>
+  left_join(
+    suppl_antibiotics_crf31 |> 
+      select(pid, crf31_start = med_start_relative_date, crf31_end = med_stop_relative_date, antibiotics_crf31 = antibiotics_cat),
+    by = "pid",
+    relationship = "many-to-many"
+  ) |> 
+  mutate(
+    overlap = !is.na(crf31_start) & crf31_start <= crf20_end & crf31_end >= crf20_start
+  ) 
+
+suppl_antibiotics_crf20_crf31 |>
+  select(pid_label, crf20_weekly_visit, crf20_start, crf20_end, antibiotics_crf20, crf31_start, crf31_end, antibiotics_crf31, PP, overlap) |>
+  arrange(overlap, is.na(crf31_start), PP) |>  
+  gt() |>
+  tab_style(
+    style = 
+      cell_fill(
+        color = "coral1", alpha = 0.1),
+        locations = cells_body(rows = !overlap)
+  ) |> 
+  tab_style(
+    style = cell_fill(color = "coral1", alpha = 0.3),
+    locations = cells_body(rows = crf20_start <= 35)
+  ) |> 
+    tab_style(
+      style = cell_fill(color = "coral1", alpha = 0.7),
+      locations = cells_body(rows = !overlap & PP & crf20_start <= 35)
+    )
+
+```
